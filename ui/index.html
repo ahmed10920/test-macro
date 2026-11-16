@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MMacro · Cyber HUD</title>
+<link rel="stylesheet" href="/ui/vendor/driver.css" />
+<script src="/ui/vendor/driver.js.iife.js"></script>
+<style>
+  :root {
+    --bg: #04070e;
+    --bg-sidebar: rgba(7, 11, 22, 0.92);
+    --panel: rgba(12, 20, 36, 0.72);
+    --panel-solid: #0c1424;
+    --panel-alt: rgba(18, 30, 52, 0.78);
+    --sunk: rgba(5, 9, 17, 0.85);
+    --border: rgba(56, 189, 248, 0.16);
+    --border-bright: rgba(56, 189, 248, 0.45);
+    --text: #f1f5f9;
+    --subtext: #94a3b8;
+    --dim: #5c6c84;
+    --accent: #38bdf8;
+    --accent-2: #818cf8;
+    --good: #22d3ee;
+    --emerald: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --biome-rgb: 56, 189, 248;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* Ambient Cyber Nebula Backdrop */
+  .ambient-bg {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(circle at 22% 18%, rgba(var(--biome-rgb), 0.14), transparent 44%),
+      radial-gradient(circle at 82% 78%, rgba(129, 140, 248, 0.10), transparent 48%),
+      linear-gradient(180deg, #04070e 0%, #050a14 100%);
+    transition: background 0.6s ease;
+  }
+  .grid-overlay {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.25;
+    background-image: radial-gradient(rgba(56, 189, 248, 0.22) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .app-shell {
+    position: relative; z-index: 1;
+    display: flex; height: 100vh; width: 100vw;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 224px; flex-shrink: 0;
+    background: var(--bg-sidebar);
+    backdrop-filter: blur(18px);
+    border-right: 1px solid rgba(56, 189, 248, 0.12);
+    display: flex; flex-direction: column;
+    padding: 16px 12px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 11px;
+    padding: 6px 8px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+  }
+  .brand-crest {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(129, 140, 248, 0.18));
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);
+    display: grid; place-items: center;
+  }
+  .brand-title { font-weight: 700; font-size: 14px; letter-spacing: 0.06em; color: #f8fafc; }
+  .brand-sub { font-family: 'Consolas', monospace; font-size: 10px; color: var(--accent); letter-spacing: 0.05em; }
+
+  .nav-label {
+    font-family: 'Consolas', monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+    color: var(--dim); padding: 14px 10px 6px;
+  }
+  .nav-list { display: flex; flex-direction: column; gap: 4px; flex: 1; overflow-y: auto; }
+  .nav-item {
+    position: relative;
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 12px; border-radius: 11px;
+    color: var(--subtext); font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1px solid transparent;
+    transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .nav-item:hover {
+    background: rgba(56, 189, 248, 0.07);
+    color: #e2e8f0;
+    border-color: rgba(56, 189, 248, 0.14);
+  }
+  .nav-item.active {
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.18), rgba(56, 189, 248, 0.05));
+    color: #ffffff; font-weight: 600;
+    border-color: rgba(56, 189, 248, 0.38);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 16px rgba(56, 189, 248, 0.12);
+  }
+  .nav-item.active::before {
+    content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px;
+    border-radius: 0 4px 4px 0;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+  }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.78; transition: 0.18s; }
+  .nav-item.active svg { color: var(--accent); opacity: 1; filter: drop-shadow(0 0 6px rgba(56,189,248,0.65)); }
+  .nav-dot {
+    margin-left: auto; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--good); box-shadow: 0 0 8px var(--good);
+    display: none;
+  }
+  .nav-dot.on { display: block; }
+
+  .sidebar-footer {
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .power-btn {
+    width: 100%; padding: 11px 14px; border-radius: 12px;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(56, 189, 248, 0.08));
+    color: #7dd3fc; font-family: 'Consolas', monospace; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    cursor: pointer; transition: all 0.2s ease;
+  }
+  .power-btn:hover {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.32), rgba(14, 165, 233, 0.18));
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.25); transform: translateY(-1px);
+  }
+  .power-btn.running {
+    border-color: rgba(248, 113, 113, 0.55);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.24), rgba(220, 38, 38, 0.1));
+    color: #fca5a5;
+  }
+  .power-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+
+  /* Workspace */
+  .main {
+    flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 28px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .top-left { display: flex; flex-direction: column; gap: 4px; }
+  .title-line { display: flex; align-items: center; gap: 12px; }
+  .page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.28);
+    font-family: 'Consolas', monospace; font-size: 11px; font-weight: 700; color: #7dd3fc;
+  }
+  .status-pill.live {
+    background: rgba(34, 211, 238, 0.15); border-color: rgba(34, 211, 238, 0.5); color: #67e8f9;
+  }
+  .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+  .status-pill.live .pulse-dot {
+    background: var(--good); box-shadow: 0 0 10px var(--good);
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: 0.6; } }
+
+  .user-sub {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--subtext);
+  }
+  .user-sub span.mono { font-family: 'Consolas', monospace; color: var(--dim); font-size: 11px; }
+
+  .top-right { display: flex; align-items: center; gap: 10px; }
+  .tele-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 12px; border-radius: 10px;
+    background: var(--panel); border: 1px solid rgba(255, 255, 255, 0.08);
+    font-family: 'Consolas', monospace; font-size: 11px; font-weight: 700; color: var(--subtext);
+  }
+  .tele-pill.linked { border-color: rgba(34, 211, 238, 0.35); color: #e2e8f0; }
+  .tele-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+  .tele-pill.linked .tele-dot { background: var(--emerald); box-shadow: 0 0 8px var(--emerald); }
+
+  /* Scroll Content */
+  .scroll-area {
+    flex: 1; overflow-y: auto; padding: 18px 28px 28px;
+  }
+  .scroll-area::-webkit-scrollbar { width: 7px; }
+  .scroll-area::-webkit-scrollbar-track { background: transparent; }
+  .scroll-area::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.22); border-radius: 99px; }
+  .scroll-area::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.45); }
+
+  .page { display: none; animation: fadeSlide 0.2s ease; }
+  .page.active { display: block; }
+  @keyframes fadeSlide { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Dashboard 3-Column Cyber Grid */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 280px minmax(300px, 1.15fr) minmax(260px, 0.95fr);
+    gap: 20px; align-items: start;
+  }
+
+  .glass-card {
+    position: relative;
+    background: var(--panel);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(56, 189, 248, 0.16);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  .hud-corners::before, .hud-corners::after {
+    content: ""; position: absolute; width: 12px; height: 12px; pointer-events: none; z-index: 3;
+    border-color: rgba(var(--biome-rgb), 0.7); border-style: solid;
+  }
+  .hud-corners::before { top: 10px; left: 10px; border-width: 1.5px 0 0 1.5px; border-radius: 3px 0 0 0; }
+  .hud-corners::after { bottom: 10px; right: 10px; border-width: 0 1.5px 1.5px 0; border-radius: 0 0 3px 0; }
+
+  /* Hero Biome Card */
+  .hero-card {
+    height: 248px; padding: 22px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .hero-bg-img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    filter: blur(14px) brightness(0.42) saturate(1.4); transform: scale(1.15);
+    z-index: 0; transition: all 0.4s ease;
+  }
+  .hero-gradient {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(180deg, rgba(var(--biome-rgb), 0.18) 0%, rgba(5, 9, 17, 0.92) 100%);
+  }
+  .hero-content { position: relative; z-index: 2; display: flex; flex-direction: column; height: 100%; justify-content: space-between; }
+  .micro-tag {
+    font-family: 'Consolas', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+    color: #7dd3fc; text-transform: uppercase;
+  }
+  .biome-emblem-wrap {
+    width: 74px; height: 74px; border-radius: 18px;
+    padding: 2px;
+    background: linear-gradient(135deg, rgba(var(--biome-rgb), 0.9), rgba(255,255,255,0.2));
+    box-shadow: 0 0 24px rgba(var(--biome-rgb), 0.35);
+    margin-top: 6px;
+  }
+  .biome-emblem {
+    width: 100%; height: 100%; border-radius: 16px; object-fit: cover; background: #070d18; display: block;
+  }
+  .hero-biome-name { font-size: 27px; font-weight: 700; letter-spacing: -0.02em; color: #f8fafc; line-height: 1.1; }
+  .hero-rate {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'Consolas', monospace; font-size: 12px; font-weight: 700; color: var(--accent);
+    margin-top: 6px;
+  }
+
+  .stats-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .stat-box { padding: 14px 16px; }
+  .stat-label { font-family: 'Consolas', monospace; font-size: 10px; font-weight: 700; color: var(--dim); letter-spacing: 0.08em; }
+  .stat-val { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .stat-val.cyan { color: var(--accent); text-shadow: 0 0 16px rgba(56, 189, 248, 0.35); }
+
+  .btn-primary {
+    width: 100%; padding: 13px 16px; border-radius: 13px; border: none;
+    background: linear-gradient(135deg, #38bdf8, #0284c7);
+    color: #030914; font-size: 13px; font-weight: 700; letter-spacing: 0.03em;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 6px 24px rgba(56, 189, 248, 0.32);
+    transition: all 0.2s ease;
+  }
+  .btn-primary:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 8px 28px rgba(56, 189, 248, 0.45); }
+  .btn-primary.stop {
+    background: linear-gradient(135deg, #f87171, #dc2626);
+    color: #fff; box-shadow: 0 6px 24px rgba(248, 113, 113, 0.32);
+  }
+  .btn-secondary {
+    width: 100%; margin-top: 10px; padding: 11px 16px; border-radius: 13px;
+    background: rgba(15, 23, 38, 0.8); border: 1px solid rgba(56, 189, 248, 0.2);
+    color: var(--subtext); font-size: 12px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.18s ease;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--text); background: rgba(20, 34, 56, 0.9); }
+
+  .sec-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; font-family: 'Consolas', monospace; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.08em; color: var(--subtext);
+  }
+  .sec-hdr span.hl { color: var(--accent); }
+
+  /* Active Instance Card */
+  .instance-card { height: 196px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 16px; }
+  .inst-banner {
+    position: absolute; inset: 0 0 42% 0; object-fit: cover; width: 100%; height: 60%;
+    filter: blur(8px) brightness(0.65) saturate(1.4); z-index: 0;
+  }
+  .inst-fade {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(180deg, rgba(var(--biome-rgb), 0.22) 0%, rgba(10, 16, 28, 0.95) 62%);
+  }
+  .inst-top { position: relative; z-index: 2; display: flex; align-items: center; gap: 14px; }
+  .avatar-ring {
+    width: 52px; height: 52px; border-radius: 50%; overflow: hidden;
+    background: #0a1526; border: 2px solid var(--accent);
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.45);
+    display: grid; place-items: center; flex-shrink: 0;
+  }
+  .avatar-ring img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .inst-name { font-size: 15px; font-weight: 700; color: #fff; }
+  .inst-aura { font-size: 12px; color: #f472b6; font-weight: 600; margin-top: 2px; }
+  .inst-bottom { position: relative; z-index: 2; }
+  .inst-biome-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .biome-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 12px 4px 6px; border-radius: 999px;
+    background: rgba(4, 7, 14, 0.85); border: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 12px; font-weight: 600;
+  }
+  .biome-pill img { width: 18px; height: 18px; border-radius: 5px; object-fit: cover; }
+
+  /* Automation Matrix */
+  .matrix-card { padding: 12px; }
+  .matrix-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .chip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 9px 8px; border-radius: 10px;
+    background: rgba(5, 9, 17, 0.75); border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--dim); font-size: 11px; font-weight: 600; white-space: nowrap;
+    cursor: pointer; transition: all 0.18s ease;
+  }
+  .chip:hover { border-color: rgba(56, 189, 248, 0.38); color: var(--text); transform: translateY(-1px); }
+  .chip.on {
+    background: rgba(56, 189, 248, 0.14); border-color: rgba(56, 189, 248, 0.45);
+    color: #e0f2fe; box-shadow: 0 0 12px rgba(56, 189, 248, 0.14);
+  }
+  .chip-dot { width: 7px; height: 7px; border-radius: 50%; background: #334155; flex-shrink: 0; }
+  .chip.on .chip-dot { background: var(--good); box-shadow: 0 0 8px var(--good); }
+
+  /* History & Command Link */
+  .hist-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .hist-item {
+    display: flex; align-items: center; gap: 11px; padding: 10px 12px;
+    border-radius: 13px; background: var(--panel); border: 1px solid rgba(56, 189, 248, 0.15);
+  }
+  .hist-item img { width: 36px; height: 36px; border-radius: 9px; object-fit: cover; border: 1px solid rgba(255,255,255,0.16); }
+  .hist-meta { flex: 1; min-width: 0; }
+  .hist-top { display: flex; justify-content: space-between; align-items: center; }
+  .hist-biome { font-size: 13px; font-weight: 600; color: #7dd3fc; }
+  .hist-time { font-family: 'Consolas', monospace; font-size: 11px; color: var(--accent); }
+  .hist-user { font-size: 11.5px; color: var(--subtext); margin-top: 2px; }
+
+  .cmd-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .cmd-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+
+  /* Biome Counts Panel */
+  .counts-card { margin-top: 16px; padding: 18px 20px; }
+  .counts-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 10px; }
+  .counts-title { display: flex; align-items: center; gap: 9px; font-size: 15.5px; font-weight: 700; color: #f8fafc; }
+  .counts-badge {
+    font-family: 'Consolas', monospace; font-size: 11.5px; font-weight: 700;
+    padding: 5px 12px; border-radius: 9px;
+    background: rgba(16, 185, 129, 0.14); color: #34d399;
+    border: 1px solid rgba(52, 211, 153, 0.35);
+  }
+  .biome-counts-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 1080px) { .biome-counts-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 820px) { .biome-counts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .count-pill {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 14px; border-radius: 13px;
+    background: rgba(5, 9, 17, 0.84); border: 1px solid rgba(255, 255, 255, 0.08);
+    min-width: 0; transition: transform 0.16s ease, border-color 0.16s ease;
+  }
+  .count-pill:hover { transform: translateY(-1px); border-color: rgba(56, 189, 248, 0.38); }
+  .count-left { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .count-img { width: 44px; height: 44px; border-radius: 11px; object-fit: cover; flex-shrink: 0; background: #070d18; }
+  .count-meta { min-width: 0; }
+  .count-name { font-size: 13px; font-weight: 700; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .count-rate { font-family: 'Consolas', monospace; font-size: 10.5px; color: var(--subtext); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .count-val { font-family: 'Consolas', monospace; font-size: 17px; font-weight: 700; color: #60a5fa; flex-shrink: 0; padding-left: 4px; }
+  .count-val.zero { color: var(--dim); }
+
+  /* Standard Config Cards & Controls */
+  .card {
+    background: var(--panel); backdrop-filter: blur(14px);
+    border: 1px solid rgba(56, 189, 248, 0.15);
+    border-radius: 16px; margin-bottom: 16px; overflow: hidden;
+  }
+  .card-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .card-title { font-size: 15px; font-weight: 600; }
+  .card-sub { font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .badge {
+    font-family: 'Consolas', monospace; font-size: 10px; font-weight: 700;
+    padding: 3px 9px; border-radius: 6px;
+    background: rgba(56, 189, 248, 0.14); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.25);
+  }
+  .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 13px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .row:last-child { border-bottom: none; }
+  .row-info { flex: 1; }
+  .row-lbl { font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .row-hint { font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .row-actions { display: flex; align-items: center; gap: 10px; }
+  .sub-panel {
+    background: rgba(4, 7, 14, 0.55); border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 12px 20px; display: none; flex-direction: column; gap: 10px;
+  }
+  .sub-panel.open { display: flex; }
+
+  /* Pill Toggle Switch */
+  .switch {
+    position: relative; width: 44px; height: 24px; border-radius: 999px;
+    background: #172236; border: 1px solid rgba(255, 255, 255, 0.12);
+    cursor: pointer; transition: all 0.2s ease; flex-shrink: 0;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+    border-radius: 50%; background: #94a3b8; transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .switch.on { background: var(--accent); border-color: #7dd3fc; box-shadow: 0 0 12px rgba(56, 189, 248, 0.38); }
+  .switch.on::after { left: 23px; background: #040812; }
+  .switch.sm { width: 36px; height: 20px; }
+  .switch.sm::after { width: 12px; height: 12px; }
+  .switch.sm.on::after { left: 19px; }
+
+  /* Inputs & Small Buttons */
+  .input {
+    background: var(--sunk); color: var(--text);
+    border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 9px;
+    padding: 7px 11px; font-family: 'Consolas', monospace; font-size: 12px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.16); }
+  .input.center { text-align: center; width: 90px; }
+  .input.full { width: 100%; }
+  select.input { cursor: pointer; }
+
+  .btn-sm {
+    background: var(--panel-alt); color: var(--text);
+    border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 9px;
+    padding: 6px 12px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
+  }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); background: rgba(56, 189, 248, 0.12); }
+
+  /* Biome Gallery Grid */
+  .biome-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 16px 20px; }
+  .biome-tile {
+    background: var(--sunk); border: 1px solid rgba(56, 189, 248, 0.16);
+    border-radius: 13px; padding: 12px; display: flex; flex-direction: column; gap: 10px;
+    transition: border-color 0.18s;
+  }
+  .biome-tile:hover { border-color: rgba(56, 189, 248, 0.5); }
+  .biome-tile-top { display: flex; align-items: center; gap: 10px; }
+  .biome-tile-top img { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; border: 1px solid rgba(255,255,255,0.18); }
+  .biome-tile-actions { display: flex; justify-content: space-between; gap: 8px; }
+
+  /* Dynamic List Rows (Auto Pop / Shopping List) */
+  .list-stack { display: flex; flex-direction: column; gap: 8px; }
+  .item-pill-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 12px; border-radius: 10px; background: var(--sunk); border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .biome-group-box {
+    border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 12px;
+    background: rgba(7, 12, 24, 0.7); overflow: hidden;
+  }
+  .biome-group-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 12px; background: rgba(18, 30, 52, 0.65);
+  }
+
+  /* Logs Terminal */
+  .console-box {
+    margin: 0 20px 16px; padding: 12px; border-radius: 12px;
+    background: #03060c; border: 1px solid rgba(56, 189, 248, 0.18);
+    height: 220px; overflow-y: auto;
+    font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.55;
+  }
+  .log-line .ts { color: var(--dim); }
+  .log-line .tag { color: var(--accent); font-weight: 700; }
+  .log-line .tag.merchant { color: var(--warn); }
+  .log-line .tag.eden { color: var(--emerald); }
+  .log-line .tag.crash { color: var(--bad); }
+
+  /* Toast Banner */
+  #toast {
+    position: fixed; bottom: 22px; right: 26px; z-index: 99;
+    padding: 11px 18px; border-radius: 12px;
+    background: rgba(9, 17, 31, 0.96); border: 1px solid var(--accent);
+    color: var(--text); font-size: 13px; font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 18px rgba(56, 189, 248, 0.25);
+    opacity: 0; transform: translateY(10px); pointer-events: none;
+    transition: all 0.22s ease;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  .btn-danger {
+    padding: 7px 14px; border-radius: 9px;
+    background: rgba(248, 113, 113, 0.14); border: 1px solid rgba(248, 113, 113, 0.4);
+    color: #fca5a5; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .btn-danger:hover { background: rgba(248, 113, 113, 0.28); color: #fff; }
+
+  /* Driver.js Cyber-Glass Spotlight Tour Theme */
+  .driver-popover.mmacro-tour {
+    background: linear-gradient(160deg, rgba(11, 20, 38, 0.98), rgba(5, 10, 20, 0.98));
+    color: var(--text);
+    border: 1px solid rgba(56, 189, 248, 0.52);
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.72), 0 0 28px rgba(56, 189, 248, 0.22);
+    padding: 18px 20px;
+    max-width: 360px;
+  }
+  .driver-popover.mmacro-tour .driver-popover-title {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 15.5px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;
+  }
+  .driver-popover.mmacro-tour .driver-popover-description {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 12.5px; line-height: 1.55; color: #cbd5e1;
+  }
+  .driver-popover.mmacro-tour .driver-popover-description b { color: var(--accent); }
+  .driver-popover.mmacro-tour .driver-popover-progress-text {
+    font-family: 'Consolas', monospace; font-size: 11px; font-weight: 700; color: var(--accent);
+  }
+  .driver-popover.mmacro-tour .driver-popover-footer { margin-top: 14px; }
+  .driver-popover.mmacro-tour button {
+    background: rgba(18, 30, 52, 0.9); color: #e2e8f0;
+    border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 8px;
+    padding: 5px 12px; font-size: 12px; font-weight: 600; text-shadow: none;
+  }
+  .driver-popover.mmacro-tour button:hover { border-color: var(--accent); color: #fff; }
+  .driver-popover.mmacro-tour .driver-popover-next-btn {
+    background: linear-gradient(135deg, #38bdf8, #0284c7);
+    color: #030914; border-color: #38bdf8;
+  }
+  .driver-popover.mmacro-tour .driver-popover-next-btn:hover { color: #030914; filter: brightness(1.08); }
+  .driver-popover.mmacro-tour .driver-popover-close-btn {
+    background: transparent; border: none; color: var(--subtext); font-size: 18px;
+  }
+  .driver-popover.mmacro-tour .driver-popover-arrow-side-left.driver-popover-arrow { border-left-color: #0b1426; }
+  .driver-popover.mmacro-tour .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: #0b1426; }
+  .driver-popover.mmacro-tour .driver-popover-arrow-side-top.driver-popover-arrow { border-top-color: #0b1426; }
+  .driver-popover.mmacro-tour .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: #0b1426; }
+</style>
+</head>
+<body>
+  <div class="ambient-bg" id="ambientBg"></div>
+  <div class="grid-overlay"></div>
+
+  <div class="app-shell">
+    <!-- Left Glass Sidebar -->
+    <aside class="sidebar">
+      <div class="brand" onclick="switchTab('dashboard')">
+        <div class="brand-crest">
+          <img src="/ui/brand_logo.png" alt="MMACRO" style="width:28px;height:28px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(56,189,248,0.7));" />
+        </div>
+        <div>
+          <div class="brand-title">MMACRO</div>
+          <div class="brand-sub">WEBVIEW HUD v1.1.4</div>
+        </div>
+      </div>
+
+      <div class="nav-label">MODULES</div>
+      <div class="nav-list" id="navList">
+        <div class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          <span>Dashboard</span>
+        </div>
+        <div class="nav-item" data-tab="macro" onclick="switchTab('macro')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
+          <span>Macro &amp; Core</span>
+          <span class="nav-dot" id="dot-macro"></span>
+        </div>
+        <div class="nav-item" data-tab="fishing" onclick="switchTab('fishing')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12c2-3 5-3 7 0s5 3 7 0 5-3 6 0"/><path d="M2 18c2-2 5-2 7 0s5 2 7 0 5-2 6 0"/><circle cx="12" cy="6" r="2.5"/></svg>
+          <span>Auto Fishing</span>
+          <span class="nav-dot" id="dot-fishing"></span>
+        </div>
+        <div class="nav-item" data-tab="items" onclick="switchTab('items')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6M10 3v5l-5 8a3 3 0 002.6 4.5h8.8A3 3 0 0019 16l-5-8V3"/></svg>
+          <span>Items &amp; Potions</span>
+          <span class="nav-dot" id="dot-items"></span>
+        </div>
+        <div class="nav-item" data-tab="merchant" onclick="switchTab('merchant')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>Merchants &amp; Eden</span>
+          <span class="nav-dot" id="dot-merchant"></span>
+        </div>
+        <div class="nav-item" data-tab="biomes" onclick="switchTab('biomes')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>
+          <span>Biome Counts</span>
+        </div>
+        <div class="nav-item" data-tab="credits" onclick="switchTab('credits')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>Activity &amp; Credits</span>
+        </div>
+        <div class="nav-item" data-tab="settings" onclick="switchTab('settings')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <span>Webhook</span>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="power-btn" id="sidePowerBtn" onclick="toggleRun()">
+          <span class="power-dot"></span>
+          <span id="sidePowerTxt">ENGAGE [F1]</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main">
+      <header class="topbar">
+        <div class="top-left">
+          <div class="title-line">
+            <h1 class="page-title" id="pageTitle">Dashboard</h1>
+            <div class="status-pill" id="statusPill">
+              <span class="pulse-dot"></span>
+              <span id="statusText">IDLE</span>
+            </div>
+          </div>
+          <div class="user-sub">
+            <span style="color:var(--accent)">◈</span>
+            <span id="playerName">Player</span>
+            <span class="mono">· SOL'S RNG CYBER HUD</span>
+          </div>
+        </div>
+
+        <div class="top-right">
+          <div class="tele-pill" id="robloxPill">
+            <span class="tele-dot"></span>
+            <span id="robloxText">ROBLOX: CHECKING</span>
+          </div>
+          <div class="tele-pill">
+            <span style="color:var(--accent)">⏱</span>
+            <span id="uptimeText">00:00:00</span>
+          </div>
+          <div class="tele-pill" id="topMostPill" style="cursor:pointer;gap:8px" title="Keep MMacro HUD above other windows" onclick="toggleOnTop()">
+            <span style="font-size:11px">ON TOP</span>
+            <div class="switch sm" id="topMostSwitch"></div>
+          </div>
+          <button class="btn-sm" id="tourTriggerBtn" onclick="openTutorial(0)" title="Start Interactive UI Walkthrough">? Tutorial</button>
+        </div>
+      </header>
+
+      <div class="scroll-area">
+        <!-- PAGE 1: DASHBOARD -->
+        <section class="page active" id="page-dashboard">
+          <div class="dash-grid">
+            <!-- Col 1: Hero Biome + Stats + Actions -->
+            <div>
+              <div class="glass-card hud-corners hero-card" id="heroCard">
+                <img class="hero-bg-img" id="heroBgImg" src="" alt="" />
+                <div class="hero-gradient"></div>
+                <div class="hero-content">
+                  <div>
+                    <div class="micro-tag">BIOME SIGNAL</div>
+                    <div class="biome-emblem-wrap">
+                      <img class="biome-emblem" id="heroEmblem" src="" alt="Biome" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="hero-biome-name" id="heroBiomeName">Normal</div>
+                    <div class="hero-rate" id="heroBiomeRate">◈ 1/1/sec</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stats-pair">
+                <div class="glass-card hud-corners stat-box">
+                  <div class="stat-label">INSTANCES</div>
+                  <div class="stat-val" id="instCount">0</div>
+                </div>
+                <div class="glass-card hud-corners stat-box">
+                  <div class="stat-label">RARES</div>
+                  <div class="stat-val cyan" id="raresCount">0</div>
+                </div>
+              </div>
+
+              <button class="btn-primary" id="mainActionBtn" onclick="toggleRun()">▶ START MONITORING (F1)</button>
+            </div>
+
+            <!-- Col 2: Active Instance + Automation Matrix -->
+            <div>
+              <div class="sec-hdr">
+                <span>ACTIVE INSTANCE <span class="hl" id="activeInstBadge">(0)</span></span>
+              </div>
+              <div class="glass-card instance-card">
+                <img class="inst-banner" id="instBannerImg" src="" alt="" />
+                <div class="inst-fade"></div>
+                <div class="inst-top">
+                  <div class="avatar-ring" style="cursor:pointer" title="Click to manage Roblox Username & Avatar in Webhook tab" onclick="switchTab('settings')"><img id="instAvatarImg" src="/avatar.png" alt="Roblox Avatar" /></div>
+                  <div>
+                    <div class="inst-name" id="instPlayerName">Player</div>
+                    <div class="inst-aura" id="instAura">✦ None Equipped</div>
+                  </div>
+                </div>
+                <div class="inst-bottom">
+                  <div class="inst-biome-title" id="instBiomeTitle">Normal</div>
+                  <div class="biome-pill">
+                    <img id="instBiomePillImg" src="" alt="" />
+                    <span id="instBiomePillTxt">Normal</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="sec-hdr">
+                <span>AUTOMATION MATRIX</span>
+                <span style="color:var(--dim);font-size:10px">CLICK TO TOGGLE</span>
+              </div>
+              <div class="glass-card matrix-card">
+                <div class="matrix-grid" id="matrixGrid"></div>
+              </div>
+            </div>
+
+            <!-- Col 3: Recent History + Command Link -->
+            <div>
+              <div class="sec-hdr">
+                <span>RECENT HISTORY</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="color:var(--dim);font-size:11px">Rares</span>
+                  <div class="switch sm" id="rareFilterSwitch" onclick="toggleRareFilter()"></div>
+                </div>
+              </div>
+              <div class="hist-list" id="dashHistList"></div>
+
+              <div class="sec-hdr" style="margin-top:14px">
+                <span>COMMAND LINK</span>
+              </div>
+              <div class="glass-card cmd-card">
+                <div class="cmd-row">
+                  <span style="font-family:'Consolas',monospace;color:var(--dim);font-weight:700">WEBHOOK</span>
+                  <span id="whBadge" style="font-family:'Consolas',monospace;font-weight:700;color:var(--good)">● ARMED</span>
+                </div>
+                <div class="cmd-row" style="gap:8px;flex-wrap:wrap">
+                  <span style="font-family:'Consolas',monospace;color:var(--subtext);white-space:nowrap">F1 Start · F2 Stop</span>
+                  <div style="display:flex;gap:6px;margin-left:auto">
+                    <button class="btn-sm" onclick="testWebhook()">Test Webhook</button>
+                    <button class="btn-sm" onclick="openCalibrator('all')">Calibrate ↗</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 2: MACRO & CORE -->
+        <section class="page" id="page-macro">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Core Automation &amp; Aura Handling</div><div class="card-sub">Anti-AFK protection, rare aura video clipping, and Aura Storage re-equip</div></div>
+              <span class="badge">CORE</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Anti-AFK Protection</div><div class="row-hint">Jumps every 5 minutes so Roblox never kicks you for idling</div></div>
+              <div class="switch" id="sw-anti_afk" onclick="toggleCfg('anti_afk')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Clip Rare Auras</div><div class="row-hint">Automatically records or triggers your replay hotkey when a rare aura rolls</div></div>
+              <div class="row-actions">
+                <button class="btn-sm" onclick="apiCall('open_clips')">🎬 Open Clips</button>
+                <div class="switch" id="sw-clip_on" onclick="toggleCfg('clip_on')"></div>
+              </div>
+            </div>
+            <div class="sub-panel" id="sub-clip_on">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <span style="font-size:12px;color:var(--subtext)">Min Rarity (1 in):</span>
+                <input class="input center" style="width:140px" id="inp-clip_min" onchange="saveField('clip_min', this.value)" />
+                <span style="font-size:12px;color:var(--subtext)">Resolution:</span>
+                <button class="btn-sm" id="btn-clip_quality" onclick="cycleQuality()">768p</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <div class="switch sm" id="sw-clip_key_on" onclick="toggleCfg('clip_key_on')"></div>
+                <span style="font-size:12px;color:var(--subtext)">Use external recorder hotkey (Medal / Game Bar / ShadowPlay):</span>
+                <button class="btn-sm" id="btn-clip_keys" onclick="captureClipKey()">Win+Alt+G</button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Keep an Aura Equipped</div><div class="row-hint">Automatically re-equips your chosen aura from Aura Storage after rolling</div></div>
+              <div class="switch" id="sw-equip_on" onclick="toggleCfg('equip_on')"></div>
+            </div>
+            <div class="sub-panel" id="sub-equip_on">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:12px;color:var(--subtext)">Aura Name:</span>
+                <input class="input" style="width:240px" id="inp-equip_aura" onblur="resolveAuraInput()" onkeydown="if(event.key==='Enter')resolveAuraInput()" />
+                <span id="auraMatchHint" style="font-size:12px;color:var(--good)"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Connection &amp; Performance</div><div class="card-sub">Smart private server reconnect, button calibration, and low-spec pacing</div></div>
+              <span class="badge">SYSTEM</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Smart Auto Reconnect</div><div class="row-hint">Detects disconnects or freezes and rejoins your private server</div></div>
+              <div class="row-actions">
+                <button class="btn-sm" onclick="openCalibrator('play')">🎯 Set Play</button>
+                <div class="switch" id="sw-auto_reconnect" onclick="toggleCfg('auto_reconnect')"></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Rejoin Through Browser</div><div class="row-hint">Launch private server links via your default browser if deeplinks fail</div></div>
+              <div class="switch" id="sw-rejoin_browser" onclick="toggleCfg('rejoin_browser')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Button Coordinates</div><div class="row-hint">Auto-scaled for 1080p/768p; open Calibrator only if clicks miss</div></div>
+              <button class="btn-sm" onclick="openCalibrator('all')">🎯 Open Calibrator</button>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Potato PC Mode</div><div class="row-hint">Doubles menu and click wait intervals for slower or high-ping PCs</div></div>
+              <div class="switch" id="sw-low_end" onclick="toggleCfg('low_end')"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 3: AUTO FISHING -->
+        <section class="page" id="page-fishing">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Automated Ocean Fishing &amp; Selling</div><div class="card-sub">Walks to Captain Flarg &amp; the ocean spot, reels catches, and sells inventory</div></div>
+              <span class="badge">FISHING</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Enable Auto Fishing</div><div class="row-hint">Cannot run simultaneously with Eden Detector</div></div>
+              <div class="switch" id="sw-fish_on" onclick="toggleExclusive('fish_on','eden_on','Eden Detector')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">VIP Walk Speed</div><div class="row-hint">Uses VIP movement timing when walking to Captain Flarg and the spot</div></div>
+              <div class="switch" id="sw-fish_vip" onclick="toggleCfg('fish_vip')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Sell Every N Catches</div><div class="row-hint">Number of fish caught before visiting Captain Flarg (0 = disabled)</div></div>
+              <input class="input center" id="inp-fish_sell" onchange="saveInt('fish_sell', this.value, 0)" />
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Sell Entire Bag</div><div class="row-hint">Sells every fish species in your inventory when visiting Captain Flarg</div></div>
+              <div class="switch" id="sw-fish_sell_all" onclick="toggleCfg('fish_sell_all')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Full Bag Detection</div><div class="row-hint">Automatically sells when "Cannot Fish / not enough inventory space" shows</div></div>
+              <div class="switch" id="sw-fish_full_check" onclick="toggleCfg('fish_full_check')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Sell Species Count</div><div class="row-hint">Kinds of fish sold per trip when Sell Entire Bag is turned off</div></div>
+              <input class="input center" id="inp-fish_sell_amount" onchange="saveInt('fish_sell_amount', this.value, 1)" />
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 4: ITEMS & AUTO POP -->
+        <section class="page" id="page-items">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Scheduled Item Automation</div><div class="card-sub">Strange Controller (20m), Biome Randomizer (35m), Cursed Rune &amp; Biome Selector</div></div>
+              <span class="badge">COOLDOWNS</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto SC + BR</div><div class="row-hint">Uses Strange Controller &amp; Biome Randomizer outside rare biomes</div></div>
+              <div class="switch" id="sw-auto_items" onclick="toggleCfg('auto_items')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto Cursed Rune Fragment</div><div class="row-hint">Uses a Cursed Rune Fragment after a chosen event biome runs for N seconds</div></div>
+              <div class="switch" id="sw-rune_on" onclick="toggleCfg('rune_on')"></div>
+            </div>
+            <div class="sub-panel" id="sub-rune_on">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+                <span style="font-size:12px;color:var(--subtext)">Target Biomes:</span>
+                <div style="display:flex;gap:14px;align-items:center">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-rune-PUMPKIN MOON" onclick="toggleRuneBiome('PUMPKIN MOON')"></div> Pumpkin Moon</label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-rune-GRAVEYARD" onclick="toggleRuneBiome('GRAVEYARD')"></div> Graveyard</label>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:12px;color:var(--subtext)">Use After Delay (seconds):</span>
+                <input class="input center" id="inp-rune_after" onchange="saveInt('rune_after', this.value, 0)" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto Biome Selector</div><div class="row-hint">Activates your chosen Drive every hour when off cooldown</div></div>
+              <div class="switch" id="sw-selector_on" onclick="toggleCfg('selector_on')"></div>
+            </div>
+            <div class="sub-panel" id="sub-selector_on">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:12px;color:var(--subtext)">Target Biome Drive:</span>
+                <select class="input" id="sel-selector_biome" onchange="saveField('selector_biome', this.value)"></select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Auto Pop Potions on Biome Start</div><div class="card-sub">Automatically opens Inventory and uses configured potion stacks per biome</div></div>
+              <span class="badge">POTIONS</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Enable Auto Pop</div><div class="row-hint">Triggers as soon as a configured biome starts</div></div>
+              <div class="switch" id="sw-pop_on" onclick="toggleCfg('pop_on')"></div>
+            </div>
+            <div class="sub-panel" id="sub-pop_on">
+              <div style="display:flex;gap:8px;align-items:center">
+                <select class="input" id="addPopBiomeSelect"></select>
+                <button class="btn-sm" onclick="addPopBiome()">＋ Add Biome Trigger</button>
+              </div>
+              <div class="list-stack" id="popListContainer"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 5: MERCHANTS & EDEN -->
+        <section class="page" id="page-merchant">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Merchant Detection &amp; Auto-Collection</div><div class="card-sub">Monitors Roblox cache for Mari, Jester, Rin, Sinister S. &amp; Sinister P.</div></div>
+              <span class="badge">SHOP</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Merchant &amp; Boss Detection</div><div class="row-hint">Watches rbx-storage.db and posts arrival alerts to Discord</div></div>
+              <div class="switch" id="sw-merchant_on" onclick="toggleCfg('merchant_on')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto Merchant Collection</div><div class="row-hint">Teleports to selected merchants, reads stock via OCR, and buys items below</div></div>
+              <div class="switch" id="sw-collect_on" onclick="toggleCfg('collect_on')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Teleport To Merchants</div><div class="row-hint">Choose which merchants trigger teleportation</div></div>
+              <div style="display:flex;gap:12px;align-items:center">
+                <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-merch-Jester" onclick="toggleMerchName('Jester')"></div> Jester</label>
+                <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-merch-Mari" onclick="toggleMerchName('Mari')"></div> Mari</label>
+                <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-merch-Rin" onclick="toggleMerchName('Rin')"></div> Rin</label>
+              </div>
+            </div>
+            <div style="padding:14px 20px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-size:13px;font-weight:600">Shopping List (Leave Qty empty to buy max stock)</span>
+                <span class="badge" id="buyCountBadge">0 selected</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-bottom:10px">
+                <select class="input" id="knownItemSelect" onchange="if(this.value){document.getElementById('customItemInput').value=this.value;this.value='';}"></select>
+                <input class="input" style="flex:1" id="customItemInput" placeholder="Type or select item name..." onkeydown="if(event.key==='Enter')addBuyItem()" />
+                <button class="btn-sm" onclick="addBuyItem()">＋ Add Item</button>
+              </div>
+              <div class="list-stack" id="buyListContainer"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Eden Detection &amp; Contract Automation</div><div class="card-sub">Multi-scale template matching, Limbo pathing, and contract signing</div></div>
+              <span class="badge">LIMBO</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Eden Detector</div><div class="row-hint">Cannot run simultaneously with Auto Fishing</div></div>
+              <div class="switch" id="sw-eden_on" onclick="toggleExclusive('eden_on','fish_on','Auto Fishing')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Walk to Eden &amp; Sign Contract</div><div class="row-hint">Aligns camera via Collection, walks to Eden, and presses Contract</div></div>
+              <div class="row-actions">
+                <button class="btn-sm" onclick="openCalibrator('contract')">🎯 Set Contract</button>
+                <div class="switch" id="sw-eden_path" onclick="toggleCfg('eden_path')"></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Record 60s Eden Video</div><div class="row-hint">Saves an AVI recording in %LOCALAPPDATA%\MMacro when Eden spawns</div></div>
+              <div class="switch" id="sw-eden_record" onclick="toggleCfg('eden_record')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Discord User ID to Mention (@ping)</div><div class="row-hint">Optional numeric Discord User ID pinged when Eden spawns</div></div>
+              <input class="input" style="width:210px" id="inp-eden_ping" onchange="saveField('eden_ping', this.value)" />
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 6: BIOME COUNTS (READ-ONLY) -->
+        <section class="page" id="page-biomes">
+          <div class="glass-card counts-card" id="biomeCountsCard" style="margin-top:0">
+            <div class="counts-hdr">
+              <div class="counts-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--subtext)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>
+                <span>Biome Counts</span>
+              </div>
+              <span class="counts-badge" id="biomeCountsBadge">Synced · 0 total</span>
+            </div>
+            <div class="biome-counts-grid" id="biomeCountsGrid"></div>
+          </div>
+        </section>
+
+        <!-- PAGE 7: ACTIVITY & CREDITS -->
+        <section class="page" id="page-credits">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Live Activity Console</div><div class="card-sub">Real-time event stream from MMacro modules and Roblox log watcher</div></div>
+              <div style="display:flex;gap:6px">
+                <button class="btn-sm" onclick="clearLogs()">Clear</button>
+                <button class="btn-sm" onclick="apiCall('open_data_folder')">📁 Data Folder</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;padding:10px 20px;flex-wrap:wrap" id="logFilters">
+              <button class="btn-sm" onclick="setLogFilter('all')">All</button>
+              <button class="btn-sm" onclick="setLogFilter('run')">Run</button>
+              <button class="btn-sm" onclick="setLogFilter('biomes')">Biomes</button>
+              <button class="btn-sm" onclick="setLogFilter('merchant')">Merchant</button>
+              <button class="btn-sm" onclick="setLogFilter('fishing')">Fishing</button>
+              <button class="btn-sm" onclick="setLogFilter('eden')">Eden</button>
+              <button class="btn-sm" onclick="setLogFilter('clip')">Clip</button>
+            </div>
+            <div class="console-box" id="consoleBox"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Creators &amp; Community</div><div class="card-sub">MMacro v1.1.4 · Open-source GPL-3.0 automation for Sol's RNG</div></div>
+              <button class="btn-sm" onclick="apiCall('open_discord')">💬 Join Discord</button>
+            </div>
+            <div class="row">
+              <div style="display:flex;align-items:center;gap:14px">
+                <img src="/axolotl.png" style="width:52px;height:52px;border-radius:12px;object-fit:cover" />
+                <div><div class="row-lbl">Manas</div><div class="row-hint">Solo developer and creator of MMacro</div></div>
+              </div>
+            </div>
+            <div class="row">
+              <div style="display:flex;align-items:center;gap:14px">
+                <img src="/coteab.png" style="width:52px;height:52px;border-radius:12px;object-fit:cover" />
+                <div><div class="row-lbl">@criticize.</div><div class="row-hint">Fishing logic from Coteab</div></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Community Testers</div><div class="row-hint" id="testersLine"></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 8: WEBHOOK & PROFILE -->
+        <section class="page" id="page-settings">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Discord Webhook &amp; Private Server</div><div class="card-sub">Rare biomes (Glitched, Dreamspace, Cyberspace) automatically @everyone ping with biome photos</div></div>
+              <span class="badge">WEBHOOK</span>
+            </div>
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+              <div>
+                <div class="row-lbl" style="margin-bottom:6px">Discord Webhook URL</div>
+                <div style="display:flex;gap:8px">
+                  <input class="input" type="password" style="flex:1" id="inp-webhook_url" oninput="autoSaveField('webhook_url', this.value)" onchange="saveField('webhook_url', this.value)" />
+                  <button class="btn-sm" id="toggleWhBtn" onclick="toggleWhVis()">Show</button>
+                  <button class="btn-sm" onclick="testWebhook()">🔔 Test Webhook</button>
+                </div>
+              </div>
+              <div>
+                <div class="row-lbl" style="margin-bottom:6px">Private Server Share Link</div>
+                <input class="input full" id="inp-private_server" oninput="autoSaveField('private_server', this.value)" onchange="saveField('private_server', this.value)" />
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Roblox Profile</div><div class="card-sub">Set your Roblox username for the Dashboard &amp; sync your avatar headshot</div></div>
+              <span class="badge">PROFILE</span>
+            </div>
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+              <div>
+                <div class="row-lbl" style="margin-bottom:6px">Roblox Username</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <input class="input" style="flex:1;min-width:200px" id="inp-roblox_username" placeholder="Leave empty to auto-detect from Roblox" oninput="autoSaveField('roblox_username', this.value)" onchange="applyRobloxUsername()" onkeydown="if(event.key==='Enter')applyRobloxUsername()" />
+                  <button class="btn-sm" onclick="applyRobloxUsername()">✓ Save Username</button>
+                  <button class="btn-sm" onclick="pickAvatarPhoto()">🖼 Set Avatar Photo...</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">New User Setup &amp; Reset</div><div class="card-sub">All changes auto-save automatically. Reset clears all saved settings &amp; history for a brand-new user.</div></div>
+              <span class="badge" id="autoSaveBadge">✓ AUTO-SAVE ON</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Replay Macro Tutorial</div><div class="row-hint">Step-by-step guide covering Roblox setup, webhooks, calibration &amp; hotkeys</div></div>
+              <button class="btn-sm" onclick="openTutorial(0)">📖 Open Tutorial</button>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Reset Everything (Fresh User)</div><div class="row-hint">Erases webhook URL, private server, shopping list, history &amp; custom avatar</div></div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-danger" id="resetBtn" onclick="requestResetAll()">🔄 Reset Everything</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast"></div>
+
+<script>
+let STATE = null;
+let LOG_FILTER = 'all';
+let RARE_ONLY = false;
+let ON_TOP = false;
+let RESET_ARMED = false;
+let ACTIVE_TOUR = null;
+const _autoTimers = {};
+
+function _tourGo(tab, elSelector, scrollTop = null) {
+  switchTab(tab);
+  const sc = document.querySelector('.scroll-area');
+  if (sc && scrollTop !== null) sc.scrollTop = scrollTop;
+  else if (elSelector) {
+    const el = document.querySelector(elSelector);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function openTutorial() {
+  if (!window.driver || !window.driver.js || !window.driver.js.driver) {
+    showToast('Tutorial tour library not loaded');
+    return;
+  }
+  if (ACTIVE_TOUR) {
+    try { ACTIVE_TOUR.destroy(); } catch (e) {}
+  }
+
+  _tourGo('dashboard', null, 0);
+
+  const tourSteps = [
+    {
+      tab: 'dashboard', scroll: 0,
+      popover: {
+        title: '👋 Welcome to MMacro HUD',
+        description: 'Let’s take a live guided tour around every screen so you know how the macro works.<br><br><b>Before starting:</b> Keep Roblox in <b>Windowed mode</b> (no F11 fullscreen) and <b>never</b> run Roblox as Administrator.'
+      }
+    },
+    {
+      tab: 'dashboard', scroll: 0,
+      element: '#heroCard',
+      popover: {
+        title: '◈ Live Biome Signal',
+        description: 'Reads your active Sol’s RNG log in real time and shows the current biome photo & spawn odds. Rare biomes automatically update your Discord embeds.',
+        side: 'right', align: 'start'
+      }
+    },
+    {
+      tab: 'dashboard', scroll: 0,
+      element: '#mainActionBtn',
+      popover: {
+        title: '▶ Start & Stop Monitoring (F1 / F2)',
+        description: 'Click here — or press <b>F1</b> anytime — to start automation, and press <b>F2</b> to stop safely even while inside Roblox.',
+        side: 'right'
+      }
+    },
+    {
+      tab: 'dashboard', scroll: 0,
+      element: '#matrixGrid',
+      popover: {
+        title: '⚡ Automation Matrix',
+        description: 'One-click toggles for all 9 core systems: Anti-AFK, Aura Clip, Auto Equip, Reconnect, Auto SC/BR, Auto Pop, Fishing, Merchants & Eden Hunt. Every click auto-saves.',
+        side: 'left'
+      }
+    },
+    {
+      tab: 'dashboard', scroll: 0,
+      element: '#topMostPill',
+      popover: {
+        title: '📌 ON TOP Pin Switch',
+        description: 'Turn <b>ON TOP</b> blue to float MMacro HUD above other windows, or leave it dark (OFF) so Roblox, Discord & browsers stack normally in front.',
+        side: 'bottom'
+      }
+    },
+    {
+      tab: 'items', scroll: 0,
+      element: '#page-items .card:first-child',
+      popover: {
+        title: '🧪 Items, Cursed Rune & Biome Drives',
+        description: 'Automatically fires <b>Strange Controller</b> (20m), <b>Biome Randomizer</b> (35m), <b>Cursed Rune Fragment</b>, and hourly <b>Biome Selector</b> drives. Scroll down here to build per-biome <b>Auto Pop</b> potion stacks.',
+        side: 'bottom'
+      }
+    },
+    {
+      tab: 'merchant', scroll: 0,
+      element: '#page-merchant .card:first-child',
+      popover: {
+        title: '🛒 Merchant Detection & Auto-Buy',
+        description: 'Monitors Roblox’s cache for <b>Mari</b>, <b>Jester</b>, <b>Rin</b> & bosses, teleports & reads shop stock via OCR, and buys your Shopping List.<br><br><b>Tip:</b> Turn on Detection first before Collection. Note <b>Auto Fishing</b> & <b>Eden Detector</b> cannot run together.',
+        side: 'bottom'
+      }
+    },
+    {
+      tab: 'biomes', scroll: 0,
+      element: '#biomeCountsCard',
+      popover: {
+        title: '🌐 Synced Biome Counts',
+        description: 'Tracks every biome rolled across your sessions (<b>Glitched</b>, <b>Dreamspace</b>, <b>Cyberspace</b>, weather & events) synced automatically from history.',
+        side: 'bottom'
+      }
+    },
+    {
+      tab: 'settings', scroll: 0,
+      element: '#page-settings .card:first-child',
+      popover: {
+        title: '🔔 Discord Webhook & Private Server',
+        description: 'Paste your Discord Webhook URL + Private Server share link here. <b>Glitched</b>, <b>Dreamspace</b> & <b>Cyberspace</b> automatically ping <b>@everyone</b>.<br><br>Click <b>Test Webhook</b> to verify safely (never leaks your server link).',
+        side: 'bottom'
+      }
+    },
+    {
+      tab: 'settings', scroll: 999,
+      element: '#page-settings .card:nth-child(3)',
+      popover: {
+        title: '💾 Auto-Save & Fresh User Reset',
+        description: 'Everything auto-saves automatically as you edit. Sharing the app or starting clean? Click <b>Reset Everything</b> anytime — or replay this tour from <b>? Tutorial</b> at the top-right!',
+        side: 'top'
+      }
+    }
+  ];
+
+  let driverObj = null;
+  let lastTab = 'dashboard';
+  const stepTo = (idx) => {
+    if (!driverObj) return;
+    if (idx >= tourSteps.length) {
+      driverObj.destroy();
+      return;
+    }
+    if (idx < 0) return;
+    const s = tourSteps[idx];
+    const tabChanged = (s.tab || 'dashboard') !== lastTab;
+    lastTab = s.tab || 'dashboard';
+    _tourGo(lastTab, s.element || null, s.scroll ?? 0);
+    setTimeout(() => { if (driverObj) driverObj.moveTo(idx); }, tabChanged ? 230 : 30);
+  };
+
+  driverObj = window.driver.js.driver({
+    showProgress: true,
+    animate: true,
+    smoothScroll: true,
+    allowClose: true,
+    stagePadding: 10,
+    stageRadius: 14,
+    overlayOpacity: 0.78,
+    popoverClass: 'mmacro-tour',
+    nextBtnText: 'Next →',
+    prevBtnText: '← Back',
+    doneBtnText: '✓ Finish Tour',
+    steps: tourSteps,
+    onNextClick: (el, step, opts) => {
+      const idx = (opts?.state?.activeIndex ?? 0) + 1;
+      stepTo(idx);
+    },
+    onPrevClick: (el, step, opts) => {
+      const idx = (opts?.state?.activeIndex ?? 0) - 1;
+      stepTo(idx);
+    },
+    onDestroyStarted: () => {
+      ACTIVE_TOUR = null;
+      driverObj.destroy();
+      _tourGo('dashboard', null, 0);
+      finishTutorial();
+    }
+  });
+
+  ACTIVE_TOUR = driverObj;
+  driverObj.drive();
+}
+
+async function finishTutorial() {
+  if (STATE && STATE.cfg && !STATE.cfg.tutorial_seen) {
+    STATE.cfg.tutorial_seen = true;
+    await apiCall('update_cfg', { tutorial_seen: true });
+    showToast('Tutorial complete! Press F1 anytime to start.');
+  }
+}
+
+function autoSaveField(key, val) {
+  if (STATE && STATE.cfg) STATE.cfg[key] = val;
+  clearTimeout(_autoTimers[key]);
+  _autoTimers[key] = setTimeout(async () => {
+    const badge = document.getElementById('autoSaveBadge');
+    if (badge) badge.textContent = '⟳ SAVING...';
+    await apiCall('update_cfg', { [key]: val });
+    if (badge) badge.textContent = '✓ AUTO-SAVED';
+  }, 420);
+}
+
+async function requestResetAll() {
+  const btn = document.getElementById('resetBtn');
+  if (!RESET_ARMED) {
+    RESET_ARMED = true;
+    btn.textContent = '⚠ Click Again to Confirm Reset';
+    setTimeout(() => { RESET_ARMED = false; if (btn) btn.textContent = '🔄 Reset Everything'; }, 4000);
+    return;
+  }
+  RESET_ARMED = false;
+  btn.textContent = '🔄 Reset Everything';
+  const s = await apiCall('reset_all_data');
+  if (s) { STATE = s; renderAll(); }
+  showToast('All settings & history reset to fresh user defaults');
+  openTutorial(0);
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+async function apiCall(name, ...args) {
+  if (!window.pywebview || !window.pywebview.api) return null;
+  return await window.pywebview.api[name](...args);
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  document.querySelectorAll('.page').forEach(el => el.classList.toggle('active', el.id === 'page-' + tab));
+  const titles = {
+    dashboard: 'Dashboard', macro: 'Macro & Core', fishing: 'Auto Fishing',
+    items: 'Items & Potions', merchant: 'Merchants & Eden',
+    biomes: 'Biome Counts', credits: 'Activity & Credits', settings: 'Webhook'
+  };
+  document.getElementById('pageTitle').textContent = titles[tab] || 'Dashboard';
+}
+
+function setSw(id, on) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('on', !!on);
+}
+
+function setSub(id, open) {
+  const el = document.getElementById('sub-' + id);
+  if (el) el.classList.toggle('open', !!open);
+}
+
+async function toggleCfg(key) {
+  STATE.cfg[key] = !STATE.cfg[key];
+  await apiCall('update_cfg', { [key]: STATE.cfg[key] });
+  renderAll();
+}
+
+async function toggleExclusive(key, otherKey, otherLabel) {
+  const next = !STATE.cfg[key];
+  if (next && STATE.cfg[otherKey]) {
+    showToast(`Turn off ${otherLabel} first — Fishing and Eden cannot run together.`);
+    return;
+  }
+  STATE.cfg[key] = next;
+  await apiCall('update_cfg', { [key]: next });
+  renderAll();
+}
+
+async function saveField(key, val) {
+  STATE.cfg[key] = val;
+  await apiCall('update_cfg', { [key]: val });
+  renderAll();
+}
+
+async function saveInt(key, val, minVal) {
+  const n = Math.max(minVal, parseInt(val || '0', 10) || minVal);
+  STATE.cfg[key] = n;
+  await apiCall('update_cfg', { [key]: n });
+  renderAll();
+}
+
+async function resolveAuraInput() {
+  const inp = document.getElementById('inp-equip_aura');
+  const res = await apiCall('resolve_aura', inp.value);
+  if (res && res.matched) {
+    inp.value = res.matched;
+    STATE.cfg.equip_aura = res.matched;
+    document.getElementById('auraMatchHint').textContent = '✓ Matched: ' + res.matched;
+    document.getElementById('auraMatchHint').style.color = 'var(--good)';
+  } else if (!inp.value.trim()) {
+    STATE.cfg.equip_aura = '';
+    document.getElementById('auraMatchHint').textContent = '';
+  } else {
+    document.getElementById('auraMatchHint').textContent = 'No matching aura found';
+    document.getElementById('auraMatchHint').style.color = 'var(--bad)';
+  }
+}
+
+async function cycleQuality() {
+  const list = ['768p', '1080p', '1440p', '4K'];
+  const cur = STATE.cfg.clip_quality || '768p';
+  const next = list[(list.indexOf(cur) + 1) % list.length];
+  await saveField('clip_quality', next);
+}
+
+async function captureClipKey() {
+  const btn = document.getElementById('btn-clip_keys');
+  btn.textContent = 'Press hotkey... (Esc cancels)';
+  const res = await apiCall('capture_clip_key');
+  if (res && res.ok) showToast('Clip hotkey set to ' + res.keys);
+  await refreshState();
+}
+
+async function toggleRuneBiome(name) {
+  const list = Array.isArray(STATE.cfg.rune_biomes) ? [...STATE.cfg.rune_biomes] : ['PUMPKIN MOON', 'GRAVEYARD'];
+  const idx = list.indexOf(name);
+  if (idx >= 0) list.splice(idx, 1); else list.push(name);
+  await saveField('rune_biomes', list);
+}
+
+async function toggleMerchName(name) {
+  const list = Array.isArray(STATE.cfg.collect_merchants) ? [...STATE.cfg.collect_merchants] : ['Jester', 'Mari', 'Rin'];
+  const idx = list.indexOf(name);
+  if (idx >= 0) list.splice(idx, 1); else list.push(name);
+  await saveField('collect_merchants', list);
+}
+
+async function addBuyItem() {
+  const inp = document.getElementById('customItemInput');
+  const raw = inp.value.trim();
+  if (!raw) return;
+  const resolved = await apiCall('add_buy_item', raw);
+  inp.value = '';
+  if (resolved) STATE = resolved;
+  renderAll();
+}
+
+async function dropBuyItem(name) {
+  const buy = { ...(STATE.cfg.buy_items || {}) };
+  delete buy[name];
+  await saveField('buy_items', buy);
+}
+
+async function updateBuyQty(name, qty) {
+  const buy = { ...(STATE.cfg.buy_items || {}) };
+  buy[name] = { on: true, qty: qty.trim() };
+  await saveField('buy_items', buy);
+}
+
+async function addPopBiome() {
+  const sel = document.getElementById('addPopBiomeSelect');
+  const b = sel.value;
+  if (!b) return;
+  const pop = { ...(STATE.cfg.pop_items || {}) };
+  if (!pop[b]) pop[b] = {};
+  await saveField('pop_items', pop);
+}
+
+async function dropPopBiome(b) {
+  const pop = { ...(STATE.cfg.pop_items || {}) };
+  delete pop[b];
+  await saveField('pop_items', pop);
+}
+
+async function addPopPotion(b, p) {
+  if (!p) return;
+  const pop = { ...(STATE.cfg.pop_items || {}) };
+  pop[b] = { ...(pop[b] || {}), [p]: (pop[b] && pop[b][p]) || '1' };
+  await saveField('pop_items', pop);
+}
+
+async function dropPopPotion(b, p) {
+  const pop = { ...(STATE.cfg.pop_items || {}) };
+  if (pop[b]) { delete pop[b][p]; }
+  await saveField('pop_items', pop);
+}
+
+async function setPopQty(b, p, qty) {
+  const val = Math.max(1, parseInt(qty || '1', 10) || 1);
+  const pop = { ...(STATE.cfg.pop_items || {}) };
+  if (!pop[b]) pop[b] = {};
+  pop[b][p] = String(val);
+  await saveField('pop_items', pop);
+}
+
+async function toggleRun() {
+  const res = await apiCall('toggle_run');
+  if (res && res.error) showToast(res.error);
+  await refreshState();
+}
+
+async function pickAvatarPhoto() {
+  const res = await apiCall('pick_avatar_photo');
+  if (res && res.ok) {
+    showToast('Updated avatar photo!');
+    await refreshState();
+  }
+}
+
+async function applyRobloxUsername() {
+  const inp = document.getElementById('inp-roblox_username');
+  const val = inp ? inp.value.trim() : '';
+  const nextState = await apiCall('sync_roblox_profile', val);
+  if (nextState) { STATE = nextState; renderAll(); }
+  showToast(val ? `Roblox username set to ${val}` : 'Using auto-detected Roblox username');
+}
+
+async function testWebhook() {
+  const whInp = document.getElementById('inp-webhook_url');
+  const srvInp = document.getElementById('inp-private_server');
+  const urlVal = whInp ? whInp.value : null;
+  const srvVal = srvInp ? srvInp.value : null;
+  showToast('Testing webhook connection...');
+  const res = await apiCall('test_webhook', urlVal, srvVal);
+  if (res && res.ok) {
+    showToast('Webhook verified! (No biome alert or server link sent)');
+    await refreshState();
+  } else {
+    showToast((res && res.error) || 'Failed to verify webhook');
+  }
+}
+
+function toggleWhVis() {
+  const inp = document.getElementById('inp-webhook_url');
+  const btn = document.getElementById('toggleWhBtn');
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = show ? 'Hide' : 'Show';
+}
+
+function toggleRareFilter() {
+  RARE_ONLY = !RARE_ONLY;
+  setSw('rareFilterSwitch', RARE_ONLY);
+  renderHistory();
+}
+
+async function toggleOnTop() {
+  ON_TOP = !ON_TOP;
+  setSw('topMostSwitch', ON_TOP);
+  await apiCall('set_on_top', ON_TOP);
+  showToast(ON_TOP ? 'Pinned Always On Top' : 'Always On Top turned off');
+}
+
+function openCalibrator(mode) { apiCall('open_calibrator', mode); }
+function setLogFilter(f) { LOG_FILTER = f; renderLogs(); }
+async function clearLogs() { await apiCall('clear_logs'); await refreshState(); }
+
+function renderHistory() {
+  const box = document.getElementById('dashHistList');
+  let items = (STATE.history || []).slice();
+  if (RARE_ONLY) items = items.filter(x => x.rare);
+  if (!items.length) items = [{ biome: STATE.biome_now, pretty: STATE.biome_pretty, time: '--:--:--', img: STATE.biome_img }];
+  box.innerHTML = items.slice(0, 3).map(h => `
+    <div class="hist-item">
+      <img src="${h.img}?v=${STATE.cache_bust}" alt="" />
+      <div class="hist-meta">
+        <div class="hist-top">
+          <span class="hist-biome">${h.pretty}</span>
+          <span class="hist-time">${h.time}</span>
+        </div>
+        <div class="hist-user">${STATE.player_name}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderLogs() {
+  const box = document.getElementById('consoleBox');
+  const rows = (STATE.logs || []).filter(l => LOG_FILTER === 'all' || l.tag === LOG_FILTER);
+  if (!rows.length) {
+    box.innerHTML = `<div style="color:var(--dim)">No activity logged yet in this session. Press Start (F1) to begin.</div>`;
+    return;
+  }
+  box.innerHTML = rows.map(l => `
+    <div class="log-line">
+      <span class="ts">${l.ts}</span>
+      <span class="tag ${l.tag}">[${l.tag}]</span>
+      <span>${l.msg.replace(/</g,'&lt;')}</span>
+    </div>
+  `).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+function renderAll() {
+  if (!STATE) return;
+  const c = STATE.cfg;
+  document.documentElement.style.setProperty('--biome-rgb', STATE.biome_rgb);
+
+  // Header & Sidebar
+  document.getElementById('playerName').textContent = STATE.player_name;
+  document.getElementById('instPlayerName').textContent = STATE.player_name;
+  document.getElementById('statusText').textContent = STATE.running ? 'LIVE' : (STATE.phase || 'IDLE').toUpperCase();
+  document.getElementById('statusPill').classList.toggle('live', STATE.running);
+  document.getElementById('uptimeText').textContent = STATE.uptime;
+  document.getElementById('robloxPill').classList.toggle('linked', STATE.roblox_up);
+  document.getElementById('robloxText').textContent = STATE.roblox_up ? 'ROBLOX: LINKED' : 'ROBLOX: OFFLINE';
+
+  const sideBtn = document.getElementById('sidePowerBtn');
+  sideBtn.classList.toggle('running', STATE.running);
+  document.getElementById('sidePowerTxt').textContent = STATE.running ? 'STOP [F2]' : 'ENGAGE [F1]';
+
+  const mainBtn = document.getElementById('mainActionBtn');
+  mainBtn.classList.toggle('stop', STATE.running);
+  mainBtn.textContent = STATE.running ? '⏹ STOP MONITORING (F2)' : '▶ START MONITORING (F1)';
+
+  // Nav dots
+  document.getElementById('dot-macro').classList.toggle('on', !!(c.anti_afk || c.clip_on || c.equip_on || c.auto_reconnect));
+  document.getElementById('dot-fishing').classList.toggle('on', !!c.fish_on);
+  document.getElementById('dot-items').classList.toggle('on', !!(c.auto_items || c.rune_on || c.selector_on || c.pop_on));
+  document.getElementById('dot-merchant').classList.toggle('on', !!(c.merchant_on || c.collect_on || c.eden_on));
+
+  // Dashboard cards
+  const imgUrl = STATE.biome_img + '?v=' + STATE.cache_bust;
+  const avUrl = (STATE.avatar_url || '/avatar.png') + '?v=' + STATE.cache_bust;
+  const avImg = document.getElementById('instAvatarImg');
+  if (avImg && avImg.getAttribute('src') !== avUrl) avImg.src = avUrl;
+  document.getElementById('heroBgImg').src = imgUrl;
+  document.getElementById('heroEmblem').src = imgUrl;
+  document.getElementById('heroBiomeName').textContent = STATE.biome_pretty;
+  document.getElementById('heroBiomeRate').textContent = '◈ ' + STATE.biome_rate;
+  document.getElementById('instCount').textContent = STATE.roblox_up ? '1' : '0';
+  document.getElementById('raresCount').textContent = String(STATE.rares_count);
+  document.getElementById('activeInstBadge').textContent = `(${STATE.roblox_up ? 1 : 0})`;
+  document.getElementById('instBannerImg').src = imgUrl;
+  document.getElementById('instAura').textContent = '✦ ' + (STATE.aura_now || 'None Equipped');
+  document.getElementById('instBiomeTitle').textContent = STATE.biome_pretty;
+  document.getElementById('instBiomePillImg').src = imgUrl;
+  document.getElementById('instBiomePillTxt').textContent = STATE.biome_pretty;
+
+  const countsTotal = STATE.biome_counts_total ?? 0;
+  document.getElementById('biomeCountsBadge').textContent = `Synced · ${countsTotal.toLocaleString()} total`;
+  document.getElementById('biomeCountsGrid').innerHTML = (STATE.biome_counts || []).map(item => `
+    <div class="count-pill" style="border-color:${item.color}33" title="${item.name}: ${item.count}">
+      <div class="count-left">
+        <img class="count-img" src="${item.img || '/biomes/normal.png'}" alt="${item.name}" style="border:1.5px solid ${item.color}99;box-shadow:0 0 12px ${item.color}33" />
+        <div class="count-meta">
+          <div class="count-name">${item.name}</div>
+          <div class="count-rate">${item.rate || 'Event Biome'}</div>
+        </div>
+      </div>
+      <span class="count-val ${item.count ? '' : 'zero'}">${item.count.toLocaleString()}</span>
+    </div>
+  `).join('');
+
+  const whOk = (c.webhook_url || '').trim().startsWith('https://');
+  const whBadge = document.getElementById('whBadge');
+  whBadge.textContent = whOk ? '● ARMED' : '● NOT SET';
+  whBadge.style.color = whOk ? 'var(--good)' : 'var(--warn)';
+
+  // Matrix chips (click toggles directly!)
+  const chips = [
+    ['Anti-AFK', 'anti_afk', null],
+    ['Aura Clip', 'clip_on', null],
+    ['Auto Equip', 'equip_on', null],
+    ['Reconnect', 'auto_reconnect', null],
+    ['Auto SC/BR', 'auto_items', null],
+    ['Auto Pop', 'pop_on', null],
+    ['Fishing', 'fish_on', ['eden_on', 'Eden Detector']],
+    ['Merchants', 'merchant_on', null],
+    ['Eden Hunt', 'eden_on', ['fish_on', 'Auto Fishing']],
+  ];
+  document.getElementById('matrixGrid').innerHTML = chips.map(([lbl, key, excl]) => `
+    <div class="chip ${c[key] ? 'on' : ''}" onclick="${excl ? `toggleExclusive('${key}','${excl[0]}','${excl[1]}')` : `toggleCfg('${key}')`}">
+      <span class="chip-dot"></span><span>${lbl}</span>
+    </div>
+  `).join('');
+
+  renderHistory();
+
+  // Toggles & sub-panels
+  ['anti_afk','clip_on','clip_key_on','equip_on','auto_reconnect','rejoin_browser','low_end',
+   'fish_on','fish_vip','fish_sell_all','fish_full_check','auto_items','rune_on','selector_on',
+   'pop_on','merchant_on','collect_on','eden_on','eden_path','eden_record'].forEach(k => setSw('sw-' + k, c[k]));
+  setSub('clip_on', c.clip_on);
+  setSub('equip_on', c.equip_on);
+  setSub('rune_on', c.rune_on);
+  setSub('selector_on', c.selector_on);
+  setSub('pop_on', c.pop_on);
+
+  ['clip_min','equip_aura','fish_sell','fish_sell_amount','rune_after','eden_ping','webhook_url','private_server','roblox_username'].forEach(k => {
+    const el = document.getElementById('inp-' + k);
+    if (el && document.activeElement !== el) el.value = c[k] ?? '';
+  });
+  document.getElementById('inp-fish_sell_amount').disabled = !!c.fish_sell_all;
+  document.getElementById('btn-clip_quality').textContent = c.clip_quality || '768p';
+  document.getElementById('btn-clip_keys').textContent = c.clip_keys || 'Win+Alt+G';
+
+  const rb = Array.isArray(c.rune_biomes) ? c.rune_biomes : [];
+  setSw('sw-rune-PUMPKIN MOON', rb.includes('PUMPKIN MOON'));
+  setSw('sw-rune-GRAVEYARD', rb.includes('GRAVEYARD'));
+
+  const cm = Array.isArray(c.collect_merchants) ? c.collect_merchants : [];
+  ['Jester','Mari','Rin'].forEach(n => setSw('sw-merch-' + n, cm.includes(n)));
+
+  // Dropdowns
+  const selDrive = document.getElementById('sel-selector_biome');
+  if (!selDrive.options.length && STATE.drives) {
+    Object.entries(STATE.drives).forEach(([k, v]) => selDrive.add(new Option(`${k} — ${v}`, k)));
+  }
+  selDrive.value = c.selector_biome || 'HEAVEN';
+
+  const popBiomeSel = document.getElementById('addPopBiomeSelect');
+  popBiomeSel.innerHTML = '';
+  Object.keys(STATE.biomes || {}).filter(b => b !== 'NORMAL' && !(c.pop_items && c.pop_items[b])).forEach(b => {
+    popBiomeSel.add(new Option(STATE.biomes[b].pretty, b));
+  });
+
+  // Auto Pop Groups
+  const popBox = document.getElementById('popListContainer');
+  popBox.innerHTML = Object.entries(c.pop_items || {}).map(([b, pots]) => `
+    <div class="biome-group-box">
+      <div class="biome-group-hdr">
+        <span style="font-weight:600;font-size:13px">${(STATE.biomes[b] && STATE.biomes[b].pretty) || b}</span>
+        <div style="display:flex;gap:6px">
+          <select class="input" onchange="if(this.value){addPopPotion('${b}', this.value); this.value='';}">
+            <option value="">＋ Add Potion...</option>
+            ${(STATE.potions || []).filter(p => !(pots && pots[p])).map(p => `<option value="${p}">${p}</option>`).join('')}
+          </select>
+          <button class="btn-sm" onclick="dropPopBiome('${b}')">✕</button>
+        </div>
+      </div>
+      <div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">
+        ${Object.entries(pots || {}).map(([p, q]) => `
+          <div class="item-pill-row">
+            <span style="color:var(--accent);font-size:12.5px">🧪 ${p}</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <button class="btn-sm" onclick="setPopQty('${b}','${p}', ${(parseInt(q,10)||1)-1})">−</button>
+              <input class="input center" style="width:54px" value="${q}" onchange="setPopQty('${b}','${p}', this.value)" />
+              <button class="btn-sm" onclick="setPopQty('${b}','${p}', ${(parseInt(q,10)||1)+1})">+</button>
+              <button class="btn-sm" onclick="dropPopPotion('${b}','${p}')">✕</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // Known items dropdown + shopping list
+  const knownSel = document.getElementById('knownItemSelect');
+  if (!knownSel.options.length && STATE.known_items) {
+    knownSel.add(new Option('📋 Catalog...', ''));
+    STATE.known_items.forEach(n => knownSel.add(new Option(n, n)));
+  }
+  const buyEntries = Object.entries(c.buy_items || {}).filter(([, v]) => v && v.on);
+  document.getElementById('buyCountBadge').textContent = `${buyEntries.length} selected`;
+  document.getElementById('buyListContainer').innerHTML = buyEntries.map(([n, v]) => `
+    <div class="item-pill-row">
+      <span style="color:var(--accent);font-size:13px">🛒 ${n}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--dim)">Qty:</span>
+        <input class="input center" style="width:72px" placeholder="Max" value="${v.qty || ''}" onchange="updateBuyQty('${n.replace(/'/g,"\\'")}', this.value)" />
+        <button class="btn-sm" onclick="dropBuyItem('${n.replace(/'/g,"\\'")}')">✕</button>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('testersLine').textContent = (STATE.testers || []).join('  ·  ');
+  renderLogs();
+}
+
+async function refreshState() {
+  const s = await apiCall('get_state');
+  if (s) { STATE = s; renderAll(); }
+}
+
+window.addEventListener('pywebviewready', async () => {
+  await refreshState();
+  if (STATE && STATE.cfg && !STATE.cfg.tutorial_seen) {
+    openTutorial(0);
+  }
+  setInterval(refreshState, 1000);
+});
+</script>
+</body>
+</html>
