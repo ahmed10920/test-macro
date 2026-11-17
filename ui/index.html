@@ -211,6 +211,26 @@
     grid-template-columns: 280px minmax(300px, 1.15fr) minmax(260px, 0.95fr);
     gap: 20px; align-items: start;
   }
+  .dash-console-card { display: none; margin-top: 20px; flex-direction: column; min-height: 180px; flex: 1; }
+  .dash-console-box {
+    flex: 1; padding: 12px 18px; overflow-y: auto;
+    font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.6;
+    background: rgba(3, 6, 12, 0.72);
+  }
+  @media (min-width: 1360px) {
+    .dash-grid {
+      grid-template-columns: minmax(310px, 0.9fr) minmax(380px, 1.3fr) minmax(330px, 1fr);
+      gap: 24px;
+    }
+    .hero-card { height: clamp(248px, 31vh, 330px); }
+    .instance-card { height: clamp(196px, 24vh, 250px); }
+    .chip { padding: 11px 10px; font-size: 11.5px; color: var(--subtext); }
+    .console-box { height: clamp(220px, 42vh, 460px); }
+  }
+  @media (min-height: 800px) {
+    #page-dashboard.active { display: flex; flex-direction: column; min-height: 100%; }
+    .dash-console-card { display: flex; }
+  }
 
   .glass-card {
     position: relative;
@@ -383,13 +403,186 @@
     min-width: 0; transition: transform 0.16s ease, border-color 0.16s ease;
   }
   .count-pill:hover { transform: translateY(-1px); border-color: rgba(56, 189, 248, 0.38); }
-  .count-left { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .count-left { display: flex; align-items: center; gap: 11px; min-width: 0; flex: 1; }
   .count-img { width: 44px; height: 44px; border-radius: 11px; object-fit: cover; flex-shrink: 0; background: #070d18; }
-  .count-meta { min-width: 0; }
+  .count-meta { min-width: 0; flex: 1; }
   .count-name { font-size: 13px; font-weight: 700; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .count-rate { font-family: 'Consolas', monospace; font-size: 10.5px; color: var(--subtext); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .count-val { font-family: 'Consolas', monospace; font-size: 17px; font-weight: 700; color: #60a5fa; flex-shrink: 0; padding-left: 4px; }
+  .count-rate { font-family: 'Consolas', monospace; font-size: 10px; color: var(--subtext); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .count-val { font-family: 'Consolas', monospace; font-size: 17px; font-weight: 700; color: #60a5fa; flex-shrink: 0; padding-left: 4px; position: relative; z-index: 2; }
   .count-val.zero { color: var(--dim); }
+
+  /* Biome Counts Rare Card FX */
+  .count-pill { position: relative; overflow: hidden; }
+  .count-left { position: relative; z-index: 2; }
+  .count-pill.rare-glitch-card {
+    border-color: rgba(59, 227, 122, 0.45) !important;
+    background: linear-gradient(135deg, rgba(6, 22, 14, 0.92), rgba(5, 11, 18, 0.92));
+    box-shadow: 0 0 18px rgba(59, 227, 122, 0.14), inset 0 0 14px rgba(59, 227, 122, 0.08);
+    animation: glitch-card-pulse 3.6s steps(1, end) infinite;
+  }
+  .count-pill.rare-glitch-card::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    background: repeating-linear-gradient(0deg, rgba(59, 227, 122, 0.07) 0px, rgba(59, 227, 122, 0.07) 1px, transparent 1px, transparent 4px);
+    animation: glitch-scan 4s linear infinite;
+  }
+  .glitch-noise-stream {
+    position: absolute; inset: 4px 34px 4px 58px; pointer-events: none; z-index: 1;
+    display: flex; align-items: flex-start; justify-content: flex-end;
+    font-family: 'Consolas', monospace; font-size: 9.5px; line-height: 1.2; letter-spacing: 1.5px;
+    color: rgba(59, 227, 122, 0.36); text-align: right; overflow: hidden; user-select: none;
+    text-shadow: 1px 0 rgba(239, 68, 68, 0.5), -1px 0 rgba(56, 189, 248, 0.5);
+  }
+  .glitch-title-fx {
+    display: inline-block;
+    text-shadow: 1.5px 0 rgba(59, 227, 122, 0.75), -1.5px 0 rgba(236, 72, 153, 0.65);
+    animation: glitch-text-skew 2.8s infinite;
+  }
+  @keyframes glitch-scan {
+    0% { transform: translateY(-4px); } 100% { transform: translateY(4px); }
+  }
+  @keyframes glitch-card-pulse {
+    0%, 92%, 100% { transform: translate(0, 0); filter: none; }
+    93% { transform: translate(-1.5px, 0.5px); filter: hue-rotate(15deg) brightness(1.15); }
+    95% { transform: translate(1.5px, -0.5px); }
+    97% { transform: translate(-1px, 0); }
+  }
+  @keyframes glitch-text-skew {
+    0%, 88%, 100% { transform: skewX(0deg); color: #f1f5f9; }
+    90% { transform: skewX(-10deg); color: #4ade80; }
+    92% { transform: skewX(8deg); color: #f472b6; }
+    94% { transform: skewX(0deg); color: #38bdf8; }
+  }
+
+  .count-pill.rare-cyber-card {
+    border-color: rgba(56, 189, 248, 0.55) !important;
+    background: linear-gradient(135deg, rgba(6, 20, 42, 0.94), rgba(5, 11, 24, 0.94));
+    box-shadow: 0 0 20px rgba(47, 211, 255, 0.18), inset 0 0 16px rgba(56, 189, 248, 0.10);
+  }
+  .cyber-bin-stream {
+    position: absolute; left: 54px; right: 26px; top: 50%; transform: translateY(-50%);
+    pointer-events: none; z-index: 1; white-space: nowrap; overflow: hidden;
+    font-family: 'Consolas', monospace; font-size: 10px; font-weight: 700; letter-spacing: 2px;
+    color: rgba(56, 189, 248, 0.24); text-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
+    user-select: none;
+  }
+  .cyber-bin-stream span {
+    display: inline-block; padding-left: 100%;
+    animation: cyber-binary-scroll 6s linear infinite;
+  }
+  @keyframes cyber-binary-scroll {
+    0% { transform: translateX(0); } 100% { transform: translateX(-100%); }
+  }
+  .cyber-status-row {
+    display: inline-flex; align-items: center; gap: 5px; margin-top: 3px; max-width: 100%;
+  }
+  .cyber-lock-icon {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 15px; height: 15px; border-radius: 4px;
+    background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.55);
+    color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+  }
+  .cyber-lock-svg { width: 9px; height: 9px; overflow: visible; }
+  .cyber-lock-shackle {
+    transform-origin: 16px 11px;
+    animation: cyber-shackle-cycle 2.8s ease-in-out infinite;
+  }
+  @keyframes cyber-shackle-cycle {
+    0%, 35% { transform: translateY(0px) rotate(0deg); }
+    50%, 82% { transform: translateY(-2.4px) rotate(14deg); }
+    100% { transform: translateY(0px) rotate(0deg); }
+  }
+  .cyber-bin-tag {
+    font-family: 'Consolas', monospace; font-size: 9.5px; font-weight: 700;
+    color: #38bdf8; letter-spacing: 0.06em;
+    text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+  }
+
+  .count-pill.rare-dream-card {
+    border-color: rgba(232, 106, 240, 0.48) !important;
+    background: linear-gradient(135deg, rgba(28, 10, 38, 0.92), rgba(10, 12, 26, 0.94));
+    box-shadow: 0 0 18px rgba(232, 106, 240, 0.16), inset 0 0 16px rgba(232, 106, 240, 0.08);
+    animation: dream-card-glow 4s ease-in-out infinite;
+  }
+  @keyframes dream-card-glow {
+    0%, 100% { box-shadow: 0 0 14px rgba(232, 106, 240, 0.16); }
+    50% { box-shadow: 0 0 24px rgba(232, 106, 240, 0.34); }
+  }
+
+  /* Rare Biome Active Hero & Spawn FX */
+  .hero-fx-layer {
+    position: absolute; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  body.rare-glitched #heroCard {
+    border-color: rgba(59, 227, 122, 0.72);
+    box-shadow: 0 0 30px rgba(59, 227, 122, 0.3), inset 0 0 20px rgba(59, 227, 122, 0.14);
+    animation: glitch-card-pulse 2.2s steps(1, end) infinite;
+  }
+  body.rare-glitched #heroCard .hero-fx-layer {
+    opacity: 1;
+    background: repeating-linear-gradient(0deg, rgba(59, 227, 122, 0.09) 0px, rgba(59, 227, 122, 0.09) 2px, transparent 2px, transparent 6px);
+  }
+  body.rare-glitched #heroBiomeName {
+    color: #4ade80;
+    text-shadow: 2px 0 rgba(239, 68, 68, 0.8), -2px 0 rgba(56, 189, 248, 0.8);
+    animation: glitch-text-skew 1.8s infinite;
+  }
+
+  body.rare-dreamspace #heroCard {
+    border-color: rgba(232, 106, 240, 0.75);
+    box-shadow: 0 0 34px rgba(232, 106, 240, 0.35), inset 0 0 24px rgba(192, 132, 252, 0.16);
+    animation: dream-card-glow 3s ease-in-out infinite;
+  }
+  body.rare-dreamspace #heroCard .hero-fx-layer {
+    opacity: 1;
+    background:
+      radial-gradient(circle at 24% 30%, rgba(232, 106, 240, 0.25) 0%, transparent 45%),
+      radial-gradient(circle at 80% 70%, rgba(168, 85, 247, 0.25) 0%, transparent 48%);
+    animation: dream-aurora-shift 5s ease-in-out infinite alternate;
+  }
+  body.rare-dreamspace #heroBiomeName {
+    color: #f5d0fe;
+    text-shadow: 0 0 18px rgba(232, 106, 240, 0.85);
+  }
+  @keyframes dream-aurora-shift {
+    0% { transform: scale(1) translate(0, 0); opacity: 0.7; }
+    100% { transform: scale(1.08) translate(6px, -6px); opacity: 1; }
+  }
+
+  body.rare-cyberspace #heroCard {
+    border-color: rgba(47, 211, 255, 0.8);
+    box-shadow: 0 0 34px rgba(47, 211, 255, 0.36), inset 0 0 22px rgba(56, 189, 248, 0.16);
+  }
+  body.rare-cyberspace #heroCard .hero-fx-layer {
+    opacity: 1;
+    background:
+      linear-gradient(180deg, transparent 0%, rgba(56, 189, 248, 0.22) 50%, transparent 100%);
+    background-size: 100% 45%;
+    animation: cyber-laser-scan 2.4s linear infinite;
+  }
+  body.rare-cyberspace #heroBiomeName {
+    color: #7dd3fc;
+    text-shadow: 0 0 18px rgba(47, 211, 255, 0.9);
+  }
+  @keyframes cyber-laser-scan {
+    0% { background-position: 0 -60%; } 100% { background-position: 0 160%; }
+  }
+
+  /* Rare Biome Spawn Alert Banner */
+  #rareSpawnBanner {
+    position: fixed; top: 22px; left: 50%; transform: translate(-50%, -18px); z-index: 120;
+    padding: 12px 24px; border-radius: 14px; pointer-events: none; opacity: 0;
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(6, 12, 24, 0.96); backdrop-filter: blur(14px);
+    border: 1.5px solid var(--accent);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.68);
+    font-family: 'Consolas', monospace; font-size: 13px; font-weight: 700; letter-spacing: 0.05em;
+    transition: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  #rareSpawnBanner.show { opacity: 1; transform: translate(-50%, 0); }
+  #rareSpawnBanner.fx-glitched { border-color: #3be37a; color: #4ade80; box-shadow: 0 0 30px rgba(59, 227, 122, 0.42); }
+  #rareSpawnBanner.fx-dreamspace { border-color: #e86af0; color: #f5d0fe; box-shadow: 0 0 30px rgba(232, 106, 240, 0.45); }
+  #rareSpawnBanner.fx-cyberspace { border-color: #2fd3ff; color: #7dd3fc; box-shadow: 0 0 30px rgba(47, 211, 255, 0.48); }
 
   /* Standard Config Cards & Controls */
   .card {
@@ -670,6 +863,7 @@
               <div class="glass-card hud-corners hero-card" id="heroCard">
                 <img class="hero-bg-img" id="heroBgImg" src="" alt="" />
                 <div class="hero-gradient"></div>
+                <div class="hero-fx-layer" id="heroFxLayer"></div>
                 <div class="hero-content">
                   <div>
                     <div class="micro-tag">BIOME SIGNAL</div>
@@ -759,6 +953,17 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <div class="glass-card dash-console-card" id="dashConsoleCard">
+            <div class="card-hdr" style="padding:12px 18px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="color:var(--accent)">▸</span>
+                <div class="card-title" style="font-size:13.5px">Live Activity Feed</div>
+              </div>
+              <button class="btn-sm" onclick="switchTab('credits')">Open Activity &amp; Filters ↗</button>
+            </div>
+            <div class="dash-console-box" id="dashConsoleBox"></div>
           </div>
         </section>
 
@@ -1110,6 +1315,7 @@
     </main>
   </div>
 
+  <div id="rareSpawnBanner"><span id="rareBannerIcon">✦</span><span id="rareBannerText">RARE BIOME SPAWNED</span></div>
   <div id="toast"></div>
 
 <script>
@@ -1566,27 +1772,62 @@ function renderHistory() {
   `).join('');
 }
 
-function renderLogs() {
-  const box = document.getElementById('consoleBox');
-  const rows = (STATE.logs || []).filter(l => LOG_FILTER === 'all' || l.tag === LOG_FILTER);
-  if (!rows.length) {
-    box.innerHTML = `<div style="color:var(--dim)">No activity logged yet in this session. Press Start (F1) to begin.</div>`;
-    return;
-  }
-  box.innerHTML = rows.map(l => `
+function _formatLogLines(rows) {
+  return rows.map(l => `
     <div class="log-line">
       <span class="ts">${l.ts}</span>
       <span class="tag ${l.tag}">[${l.tag}]</span>
       <span>${l.msg.replace(/</g,'&lt;')}</span>
     </div>
   `).join('');
-  box.scrollTop = box.scrollHeight;
+}
+
+function renderLogs() {
+  const all = STATE.logs || [];
+  const box = document.getElementById('consoleBox');
+  const rows = all.filter(l => LOG_FILTER === 'all' || l.tag === LOG_FILTER);
+  if (!rows.length) {
+    box.innerHTML = `<div style="color:var(--dim)">No activity logged yet in this session. Press Start (F1) to begin.</div>`;
+  } else {
+    box.innerHTML = _formatLogLines(rows);
+    box.scrollTop = box.scrollHeight;
+  }
+  const dashBox = document.getElementById('dashConsoleBox');
+  if (dashBox) {
+    const recent = all.slice(-40);
+    dashBox.innerHTML = recent.length
+      ? _formatLogLines(recent)
+      : `<div style="color:var(--dim)">No activity logged yet in this session. Press Start (F1) to begin.</div>`;
+    dashBox.scrollTop = dashBox.scrollHeight;
+  }
 }
 
 function renderAll() {
   if (!STATE) return;
   const c = STATE.cfg;
   document.documentElement.style.setProperty('--biome-rgb', STATE.biome_rgb);
+
+  // Per-biome spawn FX on rare biomes (GLITCHED / DREAMSPACE / CYBERSPACE)
+  const bKey = (STATE.biome_now || 'NORMAL').toUpperCase();
+  document.body.classList.toggle('rare-glitched', bKey === 'GLITCHED');
+  document.body.classList.toggle('rare-dreamspace', bKey === 'DREAMSPACE');
+  document.body.classList.toggle('rare-cyberspace', bKey === 'CYBERSPACE');
+  const heroFx = document.getElementById('heroFxLayer');
+  if (heroFx) {
+    if (bKey === 'CYBERSPACE') {
+      heroFx.innerHTML = '<div style="position:absolute;inset:0;padding:12px;font-family:Consolas,monospace;font-size:11px;color:rgba(56,189,248,0.22);letter-spacing:3px;word-break:break-all;line-height:1.8">101010101 010101101 101010101 001101010 101010101 110100101</div>';
+    } else if (bKey === 'GLITCHED') {
+      heroFx.innerHTML = '<div style="position:absolute;inset:0;padding:12px;font-family:Consolas,monospace;font-size:11px;color:rgba(59,227,122,0.22);letter-spacing:3px;word-break:break-all;line-height:1.8">!@#$%^*░▒▓?/\\|~ !@#%&░▒▓ 0xF9A2 !@#$%^*░▒▓</div>';
+    } else if (bKey === 'DREAMSPACE') {
+      heroFx.innerHTML = '<div style="position:absolute;inset:0;padding:14px;font-size:13px;color:rgba(245,208,254,0.32);letter-spacing:14px;line-height:2.2">✦ ✧ ★ ✦ ✧ ✦ ★ ✧</div>';
+    } else if (heroFx.innerHTML) {
+      heroFx.innerHTML = '';
+    }
+  }
+  if (window._lastBiomeNow && window._lastBiomeNow !== bKey && (bKey === 'GLITCHED' || bKey === 'DREAMSPACE' || bKey === 'CYBERSPACE')) {
+    triggerRareSpawnBanner(bKey, STATE.biome_pretty, STATE.biome_rate);
+  }
+  window._lastBiomeNow = bKey;
 
   // Header & Sidebar
   document.getElementById('playerName').textContent = STATE.player_name;
@@ -1631,18 +1872,38 @@ function renderAll() {
 
   const countsTotal = STATE.biome_counts_total ?? 0;
   document.getElementById('biomeCountsBadge').textContent = `Synced · ${countsTotal.toLocaleString()} total`;
-  document.getElementById('biomeCountsGrid').innerHTML = (STATE.biome_counts || []).map(item => `
-    <div class="count-pill" style="border-color:${item.color}33" title="${item.name}: ${item.count}">
+  const countsList = STATE.biome_counts || [];
+  const countsSig = countsList.map(i => `${i.key}:${i.count}`).join('|');
+  if (countsSig !== window._lastCountsSig) {
+    window._lastCountsSig = countsSig;
+    document.getElementById('biomeCountsGrid').innerHTML = countsList.map(item => {
+      const k = (item.key || '').toUpperCase();
+      const extraCls = k === 'GLITCHED' ? ' rare-glitch-card' : (k === 'CYBERSPACE' ? ' rare-cyber-card' : (k === 'DREAMSPACE' ? ' rare-dream-card' : ''));
+      const fxOverlay = k === 'GLITCHED'
+        ? `<div class="glitch-noise-stream" id="glitchNoiseStream">!@#%░▒▓?&amp;*</div>`
+        : (k === 'CYBERSPACE'
+          ? `<div class="cyber-bin-stream"><span>101010101 · 010110101 · 101010101 · 010101010</span></div>`
+          : '');
+      const nameHtml = k === 'GLITCHED'
+        ? `<span class="glitch-title-fx" id="glitchTitleFx">${item.name}</span>`
+        : item.name;
+      const rateHtml = k === 'CYBERSPACE'
+        ? `${item.rate || 'Event Biome'}<div class="cyber-status-row"><span class="cyber-lock-icon" title="Lock / Unlock"><svg class="cyber-lock-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path class="cyber-lock-shackle" d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><span class="cyber-bin-tag" id="cyberLockBin">101010101</span></div>`
+        : (item.rate || 'Event Biome');
+      return `
+    <div class="count-pill${extraCls}" style="border-color:${item.color}33" title="${item.name}: ${item.count}">
+      ${fxOverlay}
       <div class="count-left">
         <img class="count-img" src="${item.img || '/biomes/normal.png'}" alt="${item.name}" style="border:1.5px solid ${item.color}99;box-shadow:0 0 12px ${item.color}33" />
         <div class="count-meta">
-          <div class="count-name">${item.name}</div>
-          <div class="count-rate">${item.rate || 'Event Biome'}</div>
+          <div class="count-name">${nameHtml}</div>
+          <div class="count-rate">${rateHtml}</div>
         </div>
       </div>
       <span class="count-val ${item.count ? '' : 'zero'}">${item.count.toLocaleString()}</span>
-    </div>
-  `).join('');
+    </div>`;
+    }).join('');
+  }
 
   const whOk = (c.webhook_url || '').trim().startsWith('https://');
   const whBadge = document.getElementById('whBadge');
@@ -1764,6 +2025,60 @@ async function refreshState() {
   const s = await apiCall('get_state');
   if (s) { STATE = s; renderAll(); }
 }
+
+let _rareTimer = null;
+function triggerRareSpawnBanner(key, pretty, rate) {
+  const el = document.getElementById('rareSpawnBanner');
+  const icon = document.getElementById('rareBannerIcon');
+  const txt = document.getElementById('rareBannerText');
+  if (!el || !txt) return;
+  el.classList.remove('fx-glitched', 'fx-dreamspace', 'fx-cyberspace', 'show');
+  if (key === 'GLITCHED') {
+    el.classList.add('fx-glitched');
+    icon.textContent = '⚡';
+    txt.textContent = `SYSTEM BREACH · ${(pretty || 'Glitched').toUpperCase()} SPAWNED (${rate || ''})`;
+  } else if (key === 'CYBERSPACE') {
+    el.classList.add('fx-cyberspace');
+    icon.textContent = '🔓';
+    txt.textContent = `101010101 · ${(pretty || 'Cyberspace').toUpperCase()} UNLOCKED (${rate || ''})`;
+  } else {
+    el.classList.add('fx-dreamspace');
+    icon.textContent = '✦';
+    txt.textContent = `${(pretty || 'Dreamspace').toUpperCase()} AWAKENED (${rate || ''})`;
+  }
+  void el.offsetWidth;
+  el.classList.add('show');
+  clearTimeout(_rareTimer);
+  _rareTimer = setTimeout(() => el.classList.remove('show'), 4500);
+}
+
+// Live hacked-symbol flicker for Glitched card & binary pulse for Cyberspace lock/unlock card
+setInterval(() => {
+  const page = document.getElementById('page-biomes');
+  if (!page || !page.classList.contains('active')) return;
+  const glyphs = '!@#$%^&*<>?/\\|~░▒▓01';
+  const noiseEl = document.getElementById('glitchNoiseStream');
+  if (noiseEl) {
+    let s = '';
+    for (let i = 0; i < 12; i++) s += glyphs[Math.floor(Math.random() * glyphs.length)];
+    noiseEl.textContent = s;
+  }
+  const titleEl = document.getElementById('glitchTitleFx');
+  if (titleEl) {
+    if (Math.random() < 0.38) {
+      const base = 'Glitched'.split('');
+      const idx = Math.floor(Math.random() * base.length);
+      base[idx] = glyphs[Math.floor(Math.random() * 14)];
+      titleEl.textContent = base.join('');
+    } else {
+      titleEl.textContent = 'Glitched';
+    }
+  }
+  const binEl = document.getElementById('cyberLockBin');
+  if (binEl) {
+    binEl.textContent = Math.random() < 0.5 ? '101010101' : '010101010';
+  }
+}, 240);
 
 window.addEventListener('pywebviewready', async () => {
   await refreshState();
