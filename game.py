@@ -10,6 +10,7 @@ import platform
 import random
 import re
 from urllib.parse import parse_qs, urlsplit
+import shutil
 import subprocess
 import sys
 import threading
@@ -27,7 +28,34 @@ from pynput.keyboard import Controller as KeyboardController, Key
 ABORT = False            # set by Stop
 
 # ================================================================ settings (isolated clean per-user defaults)
-APP_DIR = os.path.join(os.getenv("LOCALAPPDATA") or os.path.expanduser("~"), "MMacroHUD")
+def _settings_dir():
+    """Settings live in %LOCALAPPDATA%\\Veyra. Copy the old MMacroHUD folder once."""
+    base = os.getenv("LOCALAPPDATA") or os.path.expanduser("~")
+    current = os.path.join(base, "Veyra")
+    previous = os.path.join(base, "MMacroHUD")
+    if os.path.isfile(os.path.join(current, "config.json")):
+        return current
+    if os.path.isdir(previous):
+        try:
+            os.makedirs(current, exist_ok=True)
+            for name in os.listdir(previous):
+                src = os.path.join(previous, name)
+                dst = os.path.join(current, name)
+                if os.path.exists(dst):
+                    continue
+                if os.path.isdir(src):
+                    shutil.copytree(src, dst)
+                else:
+                    shutil.copy2(src, dst)
+        except OSError:
+            pass
+        if os.path.isfile(os.path.join(current, "config.json")):
+            return current
+        return previous
+    return current
+
+
+APP_DIR = _settings_dir()
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 HISTORY_FILE = os.path.join(APP_DIR, "history.jsonl")
 DEFAULTS = {

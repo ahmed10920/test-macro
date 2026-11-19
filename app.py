@@ -230,7 +230,7 @@ try:
 except Exception as e:          # numpy's DLLs raise OSError, not ImportError
     why = str(e).strip().splitlines()[-1] if str(e).strip() else type(e).__name__
     try:
-        folder = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser('~'), 'MMacroHUD')
+        folder = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser('~'), 'Veyra')
         os.makedirs(folder, exist_ok=True)
         with open(os.path.join(folder, 'startup_error.txt'), 'w', encoding='utf-8') as f:
             f.write('%s\n\nexe: %s\n' % (e, sys.executable))

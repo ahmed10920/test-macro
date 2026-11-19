@@ -10,7 +10,7 @@ Download **Veyra.exe** from [Releases](https://github.com/ahmed10920/veyra-macro
 2. Download **Veyra.exe**.
 3. Run it. If Windows SmartScreen appears, choose **More info**, then **Run anyway**.
 
-Settings and logs stay in `%LOCALAPPDATA%\MMacroHUD`.
+Settings and logs stay in `%LOCALAPPDATA%\Veyra`.
 
 ## License
 
