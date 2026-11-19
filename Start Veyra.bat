@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
-title MMacro HUD Launcher
+title Veyra Launcher
 
 set "PY="
 for /f "delims=" %%I in ('where python 2^>nul') do (
@@ -33,8 +33,8 @@ for /d %%D in ("%LocalAppData%\Programs\Python\Python3*" "C:\Python3*") do (
 )
 
 echo.
-echo [MMacro HUD] Python 3.11 or newer was not found on this PC.
-choice /c YN /n /m "Do you want MMacro HUD to download and install Python 3.13 automatically now? [Y/N]: "
+echo [Veyra] Python 3.11 or newer was not found on this PC.
+choice /c YN /n /m "Do you want Veyra to download and install Python 3.13 automatically now? [Y/N]: "
 if errorlevel 2 (
     echo Cancelled. Install Python from https://www.python.org/downloads/ and check "Add python.exe to PATH".
     pause
@@ -55,7 +55,7 @@ for /d %%D in ("%LocalAppData%\Programs\Python\Python3*" "C:\Python3*") do (
         )
     )
 )
-echo [MMacro HUD] Could not locate Python after install. Reopen this launcher or restart PC.
+echo [Veyra] Could not locate Python after install. Reopen this launcher or restart PC.
 pause
 exit /b 1
 
@@ -65,7 +65,7 @@ if exist "%~dp0deps" set "PYTHONPATH=%~dp0deps;%PYTHONPATH%"
 "%PY%" -c "import webview, cv2, rapidocr_onnxruntime, pynput, PIL, numpy, psutil, mousekey" >nul 2>&1
 if %errorlevel% NEQ 0 (
     echo.
-    echo [MMacro HUD] Some required Python packages are not installed yet.
+    echo [Veyra] Some required Python packages are not installed yet.
     choice /c YN /n /m "Download and install missing packages from requirements.txt into .\deps now? [Y/N]: "
     if errorlevel 2 (
         echo Cancelled by user.
@@ -75,7 +75,7 @@ if %errorlevel% NEQ 0 (
     "%PY%" -m pip install --upgrade --target "%~dp0deps" -r "%~dp0requirements.txt"
     if !errorlevel! NEQ 0 (
         echo.
-        echo [MMacro HUD] Failed to install packages. Check your internet connection and try again.
+        echo [Veyra] Failed to install packages. Check your internet connection and try again.
         pause
         exit /b 1
     )

@@ -258,7 +258,7 @@ os.makedirs(BIOMES_DIR, exist_ok=True)
 
 TITLE = 'Veyra'
 VERSION = '1.1.4'
-REPO_SLUG = os.environ.get('MMACRO_REPO') or 'ahmed10920/test-macro'
+REPO_SLUG = os.environ.get('MMACRO_REPO') or 'ahmed10920/veyra-macro'
 RELEASE_PAGE = f'https://github.com/{REPO_SLUG}/releases'
 RELEASES = os.environ.get('MMACRO_UPDATE_URL') or f'https://api.github.com/repos/{REPO_SLUG}/releases?per_page=5'
 SOURCE_VERSION_URL = os.environ.get('MMACRO_SOURCE_VERSION_URL') or f'https://raw.githubusercontent.com/{REPO_SLUG}/main/app.py'
@@ -431,7 +431,7 @@ def display_line(w):
 
 
 # ================================================================ Discord & Biomes
-# One application for every copy of MMacro. Users never create their own.
+# One application for every copy of Veyra. Users never create their own.
 DISCORD_APP_ID = '1540076645262565507'
 FOOTER = 'Join Manas Biome Support/Hunt Server'
 TESTERS = ('Forsakened One', 'Daniel', 'Slpxy', 'Nova', 'imsomeone', 'Evil Talin Siran', 'ghost', '███\'█_Guest',
@@ -4091,7 +4091,7 @@ def _clear_old_unpacks():
     try:
         n = clear_old_unpacks()
         if n:
-            note('cleanup', 'deleted %d old unpacked cop%s of MMacro from %%TEMP%%' % (n, 'y' if n == 1 else 'ies'))
+            note('cleanup', 'deleted %d old unpacked cop%s of Veyra from %%TEMP%%' % (n, 'y' if n == 1 else 'ies'))
     except Exception as e:
         note('cleanup', '%s: %s' % (type(e).__name__, e))
 

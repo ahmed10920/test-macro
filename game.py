@@ -1851,7 +1851,7 @@ def _fit(hwnd, say):
     stretched = '' if abs(s - 1) < 0.01 else ' (Roblox is not DPI aware: Windows stretches it %d%%)' % round(s * 100)
     if not u32.GetWindowLongW(wintypes.HWND(hwnd), -16) & 0x00C00000:       # no title bar: fullscreen
         say('Roblox is fullscreen (or borderless) at %dx%d, a size the buttons are not made for: press F11 in Roblox '
-            'for a normal window and MMacro sizes it to 1080p%s' % (cw, ch, stretched))
+            'for a normal window and Veyra sizes it to 1080p%s' % (cw, ch, stretched))
         return False
     if u32.IsZoomed(wintypes.HWND(hwnd)):
         u32.ShowWindowAsync(wintypes.HWND(hwnd), 9)     # SW_RESTORE: a maximised window cannot be sized

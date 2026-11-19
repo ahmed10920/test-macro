@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>MMacro · Cyber HUD</title>
+<title>Veyra · Cyber HUD</title>
 <link rel="stylesheet" href="/ui/vendor/driver.css" />
 <script src="/ui/vendor/driver.js.iife.js"></script>
 <style>
@@ -1487,7 +1487,7 @@
             <span style="color:var(--accent)">⏱</span>
             <span id="uptimeText">00:00:00</span>
           </div>
-          <div class="tele-pill" id="topMostPill" style="cursor:pointer;gap:8px" title="Keep MMacro HUD above other windows" onclick="toggleOnTop()">
+          <div class="tele-pill" id="topMostPill" style="cursor:pointer;gap:8px" title="Keep Veyra above other windows" onclick="toggleOnTop()">
             <span style="font-size:11px">ON TOP</span>
             <div class="switch sm" id="topMostSwitch"></div>
           </div>
@@ -1687,7 +1687,7 @@
               <div class="switch" id="sw-low_end" onclick="toggleCfg('low_end')"></div>
             </div>
             <div class="row">
-              <div class="row-info"><div class="row-lbl">Auto-Update on Launch</div><div class="row-hint">Automatically downloads and installs new updates whenever you open MMacro HUD</div></div>
+              <div class="row-info"><div class="row-lbl">Auto-Update on Launch</div><div class="row-hint">Automatically downloads and installs new updates whenever you open Veyra</div></div>
               <div class="row-actions">
                 <span class="mono" style="font-size:11px;color:var(--dim)" id="updateStatusText">Up to date</span>
                 <button class="btn-sm" onclick="checkUpdatesNow()">↻ Check Update</button>
@@ -1860,7 +1860,7 @@
               </div>
             </div>
             <div class="row">
-              <div class="row-info"><div class="row-lbl">Record 60s Eden Video</div><div class="row-hint">Saves an AVI recording in %LOCALAPPDATA%\MMacro when Eden spawns</div></div>
+              <div class="row-info"><div class="row-lbl">Record 60s Eden Video</div><div class="row-hint">Saves an AVI recording in %LOCALAPPDATA%\Veyra when Eden spawns</div></div>
               <div class="switch" id="sw-eden_record" onclick="toggleCfg('eden_record')"></div>
             </div>
             <div class="row">
@@ -1914,7 +1914,7 @@
 
           <div class="card">
             <div class="card-hdr">
-              <div><div class="card-title">Live Activity Console</div><div class="card-sub">Real-time event stream from MMacro modules and Roblox log watcher</div></div>
+              <div><div class="card-title">Live Activity Console</div><div class="card-sub">Real-time event stream from Veyra modules and Roblox log watcher</div></div>
               <div style="display:flex;gap:6px">
                 <button class="btn-sm" onclick="clearLogs()">Clear</button>
                 <button class="btn-sm" onclick="apiCall('open_data_folder')">📁 Data Folder</button>
@@ -1936,13 +1936,13 @@
 
           <div class="card">
             <div class="card-hdr">
-              <div><div class="card-title">Creators &amp; Community</div><div class="card-sub">MMacro v1.1.4 · Open-source GPL-3.0 automation for Sol's RNG</div></div>
+              <div><div class="card-title">Creators &amp; Community</div><div class="card-sub">Veyra v1.1.4 · Open-source GPL-3.0 automation for Sol's RNG</div></div>
               <button class="btn-sm" onclick="apiCall('open_discord')">💬 Join Discord</button>
             </div>
             <div class="row">
               <div style="display:flex;align-items:center;gap:14px">
                 <img src="/axolotl.png" style="width:52px;height:52px;border-radius:12px;object-fit:cover" />
-                <div><div class="row-lbl">Manas</div><div class="row-hint">Solo developer and creator of MMacro</div></div>
+                <div><div class="row-lbl">Manas</div><div class="row-hint">Solo developer and creator of Veyra</div></div>
               </div>
             </div>
             <div class="row">
@@ -2069,7 +2069,7 @@ function openTutorial() {
     {
       tab: 'dashboard', scroll: 0,
       popover: {
-        title: '👋 Welcome to MMacro HUD',
+        title: '👋 Welcome to Veyra',
         description: 'Let’s take a live guided tour around every screen so you know how the macro works.<br><br><b>Before starting:</b> Keep Roblox in <b>Windowed mode</b> (no F11 fullscreen) and <b>never</b> run Roblox as Administrator.'
       }
     },
@@ -2105,7 +2105,7 @@ function openTutorial() {
       element: '#topMostPill',
       popover: {
         title: '📌 ON TOP Pin Switch',
-        description: 'Turn <b>ON TOP</b> blue to float MMacro HUD above other windows, or leave it dark (OFF) so Roblox, Discord & browsers stack normally in front.',
+        description: 'Turn <b>ON TOP</b> blue to float Veyra above other windows, or leave it dark (OFF) so Roblox, Discord & browsers stack normally in front.',
         side: 'bottom'
       }
     },
@@ -2576,7 +2576,7 @@ function setLogFilter(f) { LOG_FILTER = f; renderLogs(); }
 async function clearLogs() { await apiCall('clear_logs'); await refreshState(); }
 
 async function checkUpdatesNow() {
-  showToast('Checking for MMacro updates...');
+  showToast('Checking for Veyra updates...');
   const res = await apiCall('check_updates_now');
   if (res) { STATE = res; renderAll(); }
 }

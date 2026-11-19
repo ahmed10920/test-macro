@@ -67,7 +67,7 @@ def _load():
 def refresh(timeout=10):
     """Fetch the aura list from GitHub. Returns how many are known."""
     global _names, _table
-    req = urllib.request.Request(AURAS_URL, headers={'User-Agent': 'MMacro'})
+    req = urllib.request.Request(AURAS_URL, headers={'User-Agent': 'Veyra'})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         body = r.read()
     if not _read(body.decode('utf-8')):
@@ -144,7 +144,7 @@ def parse_keys(text):
     else:
         raise ValueError('%s: %r is not a key this knows' % (text, key))
     if vk in (0x70, 0x71):
-        raise ValueError('%s: F1 and F2 start and stop MMacro' % text)
+        raise ValueError('%s: F1 and F2 start and stop Veyra' % text)
     return [MODS[m] for m in dict.fromkeys(mods)], vk
 
 

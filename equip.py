@@ -226,7 +226,7 @@ def equip(aura, halt, say=print, logged=lambda since: False, other=lambda since:
         if state is None:
             on = logged(0.0)
             say('%s: the Equip button could not be read, so it is not pressed (Roblox\'s log says it is %s; '
-                'an odd window shape does this: press F11 for a window MMacro sizes)'
+                'an odd window shape does this: press F11 for a window Veyra sizes)'
                 % (aura, 'equipped' if on else 'not equipped'))
             shut()
             return on

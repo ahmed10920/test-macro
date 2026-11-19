@@ -1,4 +1,4 @@
-"""Standalone Tkinter Calibrator & Overlay Toast helper for MMacro."""
+"""Standalone Tkinter Calibrator & Overlay Toast helper for Veyra."""
 import ctypes
 import os
 import queue
@@ -84,7 +84,7 @@ class CalibrateWindow(tk.Tk):
         self.points = [p for _, group in sections for p in group]
         self.capturing = None
         self.banner = None
-        self.title('Calibrate Buttons · MMacro HUD')
+        self.title('Calibrate Buttons · Veyra')
         tall = 250 + 54 * len(self.points) if points else 560
         self.geometry('500x%d' % min(tall, self.winfo_screenheight() - 140))
         self.minsize(450, 320)
@@ -95,7 +95,7 @@ class CalibrateWindow(tk.Tk):
         h_in = tk.Frame(head, bg=SIDEBAR_BG)
         h_in.pack(fill='x', padx=22, pady=14)
         tk.Label(h_in, text='Button Calibration', bg=SIDEBAR_BG, fg=TEXT, font=(UIB, 13)).pack(anchor='w')
-        tk.Label(h_in, text='MMacro auto-scales all coordinates. Only override a button if a click misses on your screen.',
+        tk.Label(h_in, text='Veyra auto-scales all coordinates. Only override a button if a click misses on your screen.',
                  bg=SIDEBAR_BG, fg=SUBTEXT, font=(UI, 9), wraplength=440, justify='left', anchor='w').pack(fill='x', pady=(4, 0))
 
         bar = tk.Frame(self, bg=SIDEBAR_BG, highlightthickness=1, highlightbackground=EDGE)
@@ -369,7 +369,7 @@ def run(mode='all'):
         r = tk.Tk()
         r.withdraw()
         dark_titlebar(r)
-        messagebox.showinfo('MMacro HUD', 'Open Roblox first, then calibrate.')
+        messagebox.showinfo('Veyra', 'Open Roblox first, then calibrate.')
         return
     pts = game.PLAY_POINT if mode == 'play' else eden.POINTS if mode == 'contract' else None
     CalibrateWindow(pts).mainloop()

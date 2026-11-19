@@ -1,7 +1,7 @@
 """Discord Rich Presence over the local Discord IPC pipe.
 
-Shows the current biome on the user's Discord profile while MMacro is open.
-The application id is built into MMacro. Users do not create their own.
+Shows the current biome on the user's Discord profile while Veyra is open.
+The application id is built into Veyra. Users do not create their own.
 """
 import json
 import os

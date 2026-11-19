@@ -1,28 +1,16 @@
-# MMacro HUD
+# Veyra Macro
 
-A Windows macro for Sol's RNG with auto fishing, Eden, merchant detection and collection, clipping rare auras, auto reconnect, and Discord webhook alerts.
+Veyra is a Windows macro for Sol's RNG. It handles auto fishing, Eden, merchants, aura clips, reconnect, and Discord biome alerts.
 
-## Quick Start (Windows 10 / 11)
+Download **Veyra.exe** from [Releases](https://github.com/ahmed10920/veyra-macro/releases). That single file is the app. You do not need this source folder.
 
-1. Make sure **Python 3.11 or newer** is installed (check **"Add python.exe to PATH"** during install).
-2. Double-click **`Start MMacro HUD.bat`**.
-   - On the first run, it automatically installs required packages from `requirements.txt` into a local `deps` folder.
-   - New users start with clean settings and an interactive tutorial inside the app.
+## Download
 
-## Manual Run
+1. Open the [latest release](https://github.com/ahmed10920/veyra-macro/releases/latest).
+2. Download **Veyra.exe**.
+3. Run it. If Windows SmartScreen appears, choose **More info**, then **Run anyway**.
 
-```
-pip install -r requirements.txt
-python app.py
-```
-
-Settings and `logs.txt` are stored in `%LOCALAPPDATA%\MMacroHUD`.
-
-## Files
-
-- `app.py`, `ui/` - WebView HUD window, backend API, and run loop
-- `game.py`, `points.py`, `gui_points.json` - Roblox window handling, clicks, keys, and UI coordinates
-- `fishing.py`, `eden.py`, `merchant.py`, `merchant_cache.py`, `equip.py`, `clipper.py`, `potions.py` - automation modules
+Settings and logs stay in `%LOCALAPPDATA%\MMacroHUD`.
 
 ## License
 

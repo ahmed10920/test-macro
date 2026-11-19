@@ -1,4 +1,4 @@
-"""Shared Support Code session protocol, Relay store, and local discovery for MMacro."""
+"""Shared Support Code session protocol, Relay store, and local discovery for Veyra."""
 import base64
 import glob
 import io
