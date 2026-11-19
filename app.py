@@ -1,14 +1,20 @@
 from collections import Counter
+import base64
 import ctypes
+from ctypes import wintypes
 import functools
 import glob
 import http.server
+import importlib
+import importlib.util
 import io
 import itertools
 import json
 import os
+import platform
 import queue
 import re
+import secrets
 import shutil
 import socketserver
 import subprocess
@@ -21,6 +27,7 @@ import urllib.error
 import urllib.request
 import uuid
 import webbrowser
+import winreg
 
 HERE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
 if HERE_DIR not in sys.path:
@@ -48,6 +55,161 @@ def dpi_aware():
 
 dpi_aware()
 
+
+def _unblock_zone_identifiers():
+    """Strip Windows Mark-of-the-Web (:Zone.Identifier) from bundled DLLs so pythonnet/WebView2 load cleanly."""
+    try:
+        delete_w = ctypes.windll.kernel32.DeleteFileW
+    except (AttributeError, OSError):
+        return
+    roots = {HERE_DIR}
+    if getattr(sys, 'frozen', False):
+        roots.add(os.path.dirname(os.path.abspath(sys.executable)))
+    for root in roots:
+        if not root or not os.path.isdir(root):
+            continue
+        for cur, _, files in os.walk(root):
+            for name in files:
+                if name.lower().endswith(('.dll', '.exe', '.pyd', '.config')):
+                    try:
+                        delete_w(os.path.join(cur, name) + ':Zone.Identifier')
+                    except Exception:
+                        pass
+
+
+_unblock_zone_identifiers()
+
+REQUIRED_PACKAGES = (
+    ('numpy', 'numpy>=1.24,<2.4'),
+    ('PIL', 'pillow>=10.0'),
+    ('pynput', 'pynput>=1.7'),
+    ('psutil', 'psutil>=5.9'),
+    ('mousekey', 'mousekey>=1.0'),
+    ('cv2', 'opencv-python>=4.8'),
+    ('rapidocr_onnxruntime', 'rapidocr_onnxruntime>=1.4,<1.5'),
+    ('webview', 'pywebview>=5.0'),
+)
+
+SYSTEM_RUNTIMES = {
+    'WebView2': (
+        'Microsoft Edge WebView2 Runtime',
+        'https://go.microsoft.com/fwlink/p/?LinkId=2124703',
+        'MicrosoftEdgeWebview2Setup.exe',
+        ['/silent', '/install'],
+    ),
+    'NetFx48': (
+        'Microsoft .NET Framework 4.8',
+        'https://go.microsoft.com/fwlink/?linkid=2088631',
+        'ndp48-web.exe',
+        ['/q', '/norestart'],
+    ),
+    'VCRedist': (
+        'Microsoft Visual C++ Redistributable (x64)',
+        'https://aka.ms/vs/17/release/vc_redist.x64.exe',
+        'vc_redist.x64.exe',
+        ['/install', '/passive', '/norestart'],
+    ),
+}
+
+
+def _has_webview2():
+    guid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+    for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+        for sub in (
+            r'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\%s' % guid,
+            r'SOFTWARE\Microsoft\EdgeUpdate\Clients\%s' % guid,
+        ):
+            try:
+                with winreg.OpenKey(hive, sub) as k:
+                    pv, _ = winreg.QueryValueEx(k, 'pv')
+                    if str(pv or '').strip() and str(pv).strip() != '0.0.0.0':
+                        return True
+            except OSError:
+                pass
+    return False
+
+
+def _has_netfx():
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full') as k:
+            rel, _ = winreg.QueryValueEx(k, 'Release')
+            return int(rel) >= 461808
+    except OSError:
+        return False
+
+
+def _has_vcredist():
+    sys32 = os.path.join(os.environ.get('SystemRoot', r'C:\Windows'), 'System32')
+    return os.path.isfile(os.path.join(sys32, 'vcruntime140_1.dll')) and os.path.isfile(os.path.join(sys32, 'msvcp140.dll'))
+
+
+def detect_missing_requirements():
+    """Return (missing_pip_specs, missing_system_runtime_keys) on this PC."""
+    missing_pkgs = []
+    if not getattr(sys, 'frozen', False):
+        for mod, spec in REQUIRED_PACKAGES:
+            try:
+                if importlib.util.find_spec(mod) is None:
+                    missing_pkgs.append(spec)
+            except Exception:
+                missing_pkgs.append(spec)
+    missing_sys = []
+    if not _has_webview2():
+        missing_sys.append('WebView2')
+    if not _has_netfx():
+        missing_sys.append('NetFx48')
+    if not _has_vcredist():
+        missing_sys.append('VCRedist')
+    return missing_pkgs, missing_sys
+
+
+def ensure_dependencies(prompt_fn=None):
+    """Detect missing Python packages or Windows runtimes, ask permission first, then install."""
+    missing_pkgs, missing_sys = detect_missing_requirements()
+    if not missing_pkgs and not missing_sys:
+        return True
+    lines = ['Veyra detected missing components on this PC:\n']
+    for spec in missing_pkgs:
+        lines.append('  • Python package: %s' % spec)
+    for key in missing_sys:
+        lines.append('  • %s' % SYSTEM_RUNTIMES[key][0])
+    lines.append('\nWould you like Veyra to download and install them now?')
+    ask = prompt_fn or (lambda title, msg: ctypes.windll.user32.MessageBoxW(0, msg, title, 0x04 | 0x20) == 6)
+    if not ask('Veyra - Missing Requirements', '\n'.join(lines)):
+        return False
+    try:
+        if missing_pkgs:
+            os.makedirs(LOCAL_DEPS, exist_ok=True)
+            if LOCAL_DEPS not in sys.path:
+                sys.path.insert(0, LOCAL_DEPS)
+            subprocess.run(
+                [sys.executable, '-m', 'pip', 'install', '--upgrade', '--target', LOCAL_DEPS, *missing_pkgs],
+                check=True,
+            )
+            importlib.invalidate_caches()
+        for key in missing_sys:
+            label, url, fname, flags = SYSTEM_RUNTIMES[key]
+            dst = os.path.join(tempfile.gettempdir(), fname)
+            urllib.request.urlretrieve(url, dst)
+            subprocess.run([dst, *flags], check=True)
+            try:
+                os.remove(dst)
+            except OSError:
+                pass
+    except Exception as e:
+        ctypes.windll.user32.MessageBoxW(
+            0,
+            'Automatic installation failed:\n\n%s\n\nPlease check your internet connection or install manually.' % e,
+            'Veyra - Setup Failed',
+            0x10,
+        )
+        return False
+    return True
+
+
+if not ensure_dependencies():
+    sys.exit(0)
+
 try:
     from pynput import keyboard  # noqa: E402
     from PIL import Image  # noqa: E402
@@ -62,6 +224,8 @@ try:
     import selector  # noqa: E402
     import potions  # noqa: E402
     import merchant_cache  # noqa: E402
+    import support_link  # noqa: E402
+    import discord_presence  # noqa: E402
     from calibrator_ui import ToastService  # noqa: E402
 except Exception as e:          # numpy's DLLs raise OSError, not ImportError
     why = str(e).strip().splitlines()[-1] if str(e).strip() else type(e).__name__
@@ -79,7 +243,7 @@ except Exception as e:          # numpy's DLLs raise OSError, not ImportError
                                      'Send this message to Manas if it keeps happening.'
                                      % (why, '  - on Windows N or KN, install the Media Feature Pack (Settings > Apps '
                                         '> Optional features)\n' if 'DLL load failed' in why else ''),
-                                     'MMacro', 0x10)
+                                     'Veyra', 0x10)
     sys.exit(1)
 
 TEXT = '#f1f5f9'
@@ -92,10 +256,13 @@ BAD = '#f87171'
 BIOMES_DIR = os.path.join(HERE_DIR, 'biomes')
 os.makedirs(BIOMES_DIR, exist_ok=True)
 
-TITLE = 'MMacro HUD'
+TITLE = 'Veyra'
 VERSION = '1.1.4'
-RELEASE_PAGE = 'https://github.com/ManasAarohi1/MMacro/releases/latest'
-RELEASES = os.environ.get('MMACRO_UPDATE_URL') or 'https://api.github.com/repos/ManasAarohi1/MMacro/releases/latest'
+REPO_SLUG = os.environ.get('MMACRO_REPO') or 'ahmed10920/test-macro'
+RELEASE_PAGE = f'https://github.com/{REPO_SLUG}/releases'
+RELEASES = os.environ.get('MMACRO_UPDATE_URL') or f'https://api.github.com/repos/{REPO_SLUG}/releases?per_page=5'
+SOURCE_VERSION_URL = os.environ.get('MMACRO_SOURCE_VERSION_URL') or f'https://raw.githubusercontent.com/{REPO_SLUG}/main/app.py'
+SOURCE_ZIP_URL = os.environ.get('MMACRO_SOURCE_ZIP_URL') or f'https://github.com/{REPO_SLUG}/archive/refs/heads/main.zip'
 INVITE = 'https://discord.gg/oppression'
 ITEM_EVERY_S = {game.SC: 20 * 60, game.BR: 35 * 60}
 ITEM_RETRY_S = 5 * 60
@@ -142,6 +309,13 @@ LOG_MAX = 4 << 20
 
 _log_lock = threading.Lock()
 _recent_logs = []
+
+
+def _sanitize_log_text(text):
+    t = str(text or '')
+    t = re.sub(r'https://discord(?:app)?\.com/api/webhooks/[^\s"\'<>]+', 'https://discord.com/api/webhooks/[REDACTED]', t)
+    t = re.sub(r'(privateServerLinkCode=|linkCode=)[A-Za-z0-9_-]+', r'\1[REDACTED]', t)
+    return t
 
 
 def note(tag, msg):
@@ -221,8 +395,14 @@ def device_line():
                                                ', laid out at %dx%d, stretched %d%% by Windows'
                                                % (round(cw / s), round(ch / s), round(s * 100)))
         dpi = u.GetDpiForWindow(w.hwnd) if w is not None else 0
-        return ('v%s, Windows %s, screen %dx%d (all %dx%d), Roblox client %s, scale %d%%%s, MMacro %s%s%s'
-                % (VERSION, platform.version(), u.GetSystemMetrics(0), u.GetSystemMetrics(1), u.GetSystemMetrics(78),
+        prof = game.machine_profile()
+        hw = '%s GB, %s cores' % (prof.get('ram_gb') or '?', prof.get('cores') or '?')
+        if prof.get('cpu'):
+            hw += ', ' + prof['cpu']
+        if prof.get('lite'):
+            hw += ', light mode'
+        return ('v%s, Windows %s, %s, screen %dx%d (all %dx%d), Roblox client %s, scale %d%%%s, Veyra %s%s%s'
+                % (VERSION, platform.version(), hw, u.GetSystemMetrics(0), u.GetSystemMetrics(1), u.GetSystemMetrics(78),
                    u.GetSystemMetrics(79), client, round(dpi * 100 / 96), game.in_dpi(game.REAL, display_line, w),
                    game.awareness(), '' if u.IsProcessDPIAware() else ' (a compatibility setting on the exe?)',
                    ', mouse buttons swapped' if u.GetSystemMetrics(23) else ''))
@@ -251,6 +431,8 @@ def display_line(w):
 
 
 # ================================================================ Discord & Biomes
+# One application for every copy of MMacro. Users never create their own.
+DISCORD_APP_ID = '1540076645262565507'
 FOOTER = 'Join Manas Biome Support/Hunt Server'
 TESTERS = ('Forsakened One', 'Daniel', 'Slpxy', 'Nova', 'imsomeone', 'Evil Talin Siran', 'ghost', '███\'█_Guest',
            'delta_likes_cats_xd')
@@ -258,7 +440,7 @@ EMBED_GOOD, EMBED_BAD, EMBED_INFO, EMBED_BIOME, EMBED_GOLD = 0x57F287, 0xED4245,
 BIOME_COLOURS = {'NORMAL': 0x4A90E2, 'WINDY': 0x7ED6DF, 'RAINY': 0x3898EC, 'SNOWY': 0xA8D8FF, 'SAND STORM': 0xE0A85A,
                  'HELL': 0xE74C3C, 'STARFALL': 0x6C7BFF, 'CORRUPTION': 0x9B59B6, 'NULL': 0x64748B, 'HEAVEN': 0xFCD34D,
                  'LOST FOREST': 0x2ECC71, 'GLITCHED': 0x3BE37A, 'DREAMSPACE': 0xE86AF0, 'CYBERSPACE': 0x2FD3FF,
-                 'SINGULARITY': 0x6D28D9, 'THE RADIANT FOREST': 0xFDE047,
+                 'SINGULARITY': 0xF7A91D, 'THE RADIANT FOREST': 0xFDE047,
                  'GRAVEYARD': 0x6B7280, 'PUMPKIN MOON': 0xF97316, 'BLOOD RAIN': 0xDC2626}
 
 BIOME_RATES = {
@@ -442,7 +624,7 @@ _logo = []
 def logo_png():
     if not _logo:
         try:
-            with open(os.path.join(HERE_DIR, 'axolotl.png'), 'rb') as f:
+            with open(os.path.join(HERE_DIR, 'ui', 'brand_logo.png'), 'rb') as f:
                 _logo.append(f.read())
         except OSError:
             _logo.append(None)
@@ -462,7 +644,7 @@ def post_event(webhook_url, title, description='', colour=EMBED_INFO, area='Macr
                footer=True, thumb=None):
     if not webhook_url:
         return
-    embed = {'author': {'name': 'MMacro · %s' % area, 'url': INVITE}, 'title': title[:256], 'color': colour,
+    embed = {'author': {'name': 'Veyra · %s' % area, 'url': INVITE}, 'title': title[:256], 'color': colour,
              'timestamp': _timestamp()}
     files = {}
     if logo_png():
@@ -561,10 +743,10 @@ def append_history(biome):
 
 # ================================================================ HTTP Server & Roblox Profile
 COUNTS_ORDER = (
-    'GLITCHED', 'DREAMSPACE', 'CYBERSPACE', 'WINDY', 'RAINY',
+    'GLITCHED', 'DREAMSPACE', 'CYBERSPACE', 'THE RADIANT FOREST', 'WINDY', 'RAINY',
     'SNOWY', 'SAND STORM', 'HELL', 'HEAVEN', 'STARFALL',
     'CORRUPTION', 'NULL', 'LOST FOREST', 'GRAVEYARD', 'PUMPKIN MOON',
-    'BLOOD RAIN', 'SINGULARITY', 'THE RADIANT FOREST', 'NORMAL',
+    'BLOOD RAIN', 'SINGULARITY', 'NORMAL',
 )
 
 
@@ -767,6 +949,11 @@ def normalize_cfg(raw):
     cfg.setdefault('roblox_username', '')
     cfg.setdefault('roblox_uid', '')
     cfg.setdefault('tutorial_seen', False)
+    cfg.setdefault('auto_update', True)
+    cfg.setdefault('perf_mode', 'auto')
+    cfg.setdefault('fx_on', True)
+    if cfg.get('perf_mode') not in ('auto', 'lite', 'full'):
+        cfg['perf_mode'] = 'auto'
     cfg.setdefault('collect_merchants', ['Jester', 'Mari', 'Rin'])
     if not isinstance(cfg.get('buy_items'), dict):
         cfg['buy_items'] = {}
@@ -788,6 +975,12 @@ class MacroEngine:
         self._last_hotkey = {}
         self._closing = False
         self._capturing = False
+        self.updating = False
+        self.ran = False
+        self._preview_biome = None
+        self._support = None
+        self._support_lock = threading.Lock()
+        self.update_info = {'state': 'idle', 'msg': 'Up to date (v%s)' % VERSION, 'progress': 0, 'latest': VERSION}
         self.url = ''
         self.use_items = False
         self.server_link = ''
@@ -830,6 +1023,8 @@ class MacroEngine:
         self.equip_fails = 0
         self.joined_at = 0.0
         self.biome_now = 'NORMAL'
+        self._biome_since = time.time()
+        self.presence = None
         self.rares_count = 0
         self.cfg = normalize_cfg(game.load_settings())
         auto_name, auto_uid = detect_roblox_profile()
@@ -851,6 +1046,9 @@ class MacroEngine:
         self.run_id = 0
         self.cache_bust = 1
         self._history = []
+        self._log_hist = []
+        self._log_hist_path = None
+        self._log_hist_pos = 0
         self._biome_counts = Counter()
         self._lock = threading.RLock()
         self._window = None
@@ -886,12 +1084,15 @@ class MacroEngine:
         except Exception:
             pass
         self._sync_live_roblox_log(initial=True)
+        self.presence = discord_presence.DiscordPresence(log=lambda msg: note('discord', msg))
+        self.refresh_discord()
         seed_and_refresh_avatar(self.roblox_uid, on_ready=self._bump_cache_bust, stop_fn=lambda: self._closing)
 
         self.cache = merchant_cache.Tracker()
         self._keyboard = keyboard
         threading.Thread(target=self._watch_cache, daemon=True).start()
         threading.Thread(target=self._poll_hotkeys, daemon=True).start()
+        threading.Thread(target=self._watch_user_pc, daemon=True).start()
         threading.Thread(target=self._poll_live_telemetry, daemon=True).start()
         threading.Thread(target=self._autosave_loop, daemon=True).start()
         threading.Thread(target=self._fetch_auras, daemon=True).start()
@@ -1050,6 +1251,7 @@ class MacroEngine:
                     'pop_on': self.cfg_bool('pop_on'),
                     'pop_items': self.pop_list,
                     'anti_afk': self.cfg_bool('anti_afk', True),
+                    'yield_pc': self.cfg_bool('yield_pc', True),
                     'merchant_on': self.cfg_bool('merchant_on'),
                     'webhook_url': clean_url(self.cfg_str('webhook_url')),
                     'private_server': game.tidy_link(self.cfg_str('private_server')),
@@ -1077,7 +1279,12 @@ class MacroEngine:
                     'equip_aura': self.cfg_str('equip_aura').strip(),
                     'roblox_username': self.cfg_str('roblox_username').strip(),
                     'roblox_uid': self.cfg_str('roblox_uid').strip(),
+                    'discord_rpc': self.cfg_bool('discord_rpc', True),
+                    'theme': self.cfg_str('theme', 'dark') if self.cfg_str('theme', 'dark') in ('dark', 'white', 'midnight', 'ember', 'forest', 'bw') else 'dark',
+                    'perf_mode': self.cfg_str('perf_mode', 'auto') if self.cfg_str('perf_mode', 'auto') in ('auto', 'lite', 'full') else 'auto',
+                    'fx_on': self.cfg_bool('fx_on', True),
                     'tutorial_seen': self.cfg_bool('tutorial_seen'),
+                    'auto_update': self.cfg_bool('auto_update', True),
                     'buy_items': self.cfg.get('buy_items') or {},
                     'buy_list': '',
                 }
@@ -1109,8 +1316,9 @@ class MacroEngine:
                 if found_b and found_a:
                     break
             changed = False
-            if found_b and found_b != self.biome_now and (initial or not self.running):
-                self.biome_now = found_b
+            watching = self.biome_stop is not None and not self.biome_stop.is_set()
+            if found_b and found_b != self.biome_now and (initial or not watching):
+                self._touch_biome(found_b)
                 changed = True
             if found_a and found_a != self.aura_logged[0]:
                 self.aura_logged = (found_a, time.time())
@@ -1119,13 +1327,150 @@ class MacroEngine:
         except Exception:
             return False
 
+    def _refresh_log_history(self):
+        """Recent biomes from the Roblox log's own timestamps, not the last time the watcher saved one."""
+        path = game.newest_log()
+        if not path or not os.path.exists(path):
+            return
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            return
+        with self._lock:
+            if path != self._log_hist_path or size < self._log_hist_pos:
+                self._log_hist_path = path
+                self._log_hist = []
+                self._log_hist_pos = 0
+            start = self._log_hist_pos
+            last = self._log_hist[-1]['biome'] if self._log_hist else None
+        if size == start:
+            return
+        try:
+            with open(path, 'rb') as f:
+                f.seek(start)
+                data = f.read()
+                end = f.tell()
+        except OSError:
+            return
+        if data and not data.endswith(b'\n'):
+            cut = data.rfind(b'\n')
+            if cut < 0:
+                return
+            end -= len(data) - cut - 1
+            data = data[:cut + 1]
+        added = []
+        today = time.strftime('%Y-%m-%d')
+        for line in data.decode('utf-8', errors='replace').splitlines():
+            name = game.biome_from_line(line)
+            if not name:
+                continue
+            name = name.upper()
+            if name == last:
+                continue
+            when = game.time_from_line(line) or time.time()
+            local = time.localtime(when)
+            day = time.strftime('%Y-%m-%d', local)
+            added.append({
+                'biome': name,
+                'time': time.strftime('%H:%M:%S', local),
+                'day': '' if day == today else time.strftime('%b %d', local),
+                'ts': when,
+            })
+            last = name
+        with self._lock:
+            if path != self._log_hist_path:
+                return
+            self._log_hist_pos = end
+            if added:
+                self._log_hist.extend(added)
+                if len(self._log_hist) > 120:
+                    del self._log_hist[:60]
+
     def _poll_live_telemetry(self):
         while not self._closing:
             try:
-                self._sync_live_roblox_log()
+                self._refresh_log_history()
+                if self._sync_live_roblox_log():
+                    self.refresh_discord()
             except Exception:
                 pass
             time.sleep(1.0)
+
+    def _touch_biome(self, name):
+        name = (name or '').upper()
+        if not name or name == self.biome_now:
+            return False
+        self.biome_now = name
+        self._biome_since = time.time()
+        return True
+
+    def refresh_discord(self):
+        """Push the current biome to Discord Rich Presence."""
+        presence = getattr(self, 'presence', None)
+        if presence is None:
+            return
+        try:
+            enabled = self.cfg_bool('discord_rpc', True)
+            presence.configure(enabled, DISCORD_APP_ID)
+            if not enabled:
+                presence.set_activity(None)
+                return
+            if not self.running:
+                presence.set_activity({
+                    'details': 'Veyra',
+                    'state': 'Not running',
+                    'assets': {
+                        'large_image': 'veyra',
+                        'large_text': 'Veyra',
+                    },
+                })
+                return
+            biome = base_biome(self.biome_now or 'NORMAL') or 'NORMAL'
+            label = pretty(biome) or 'Normal'
+            aura = self.aura_logged[0] if self.aura_logged and self.aura_logged[0] not in (None, '', '_None_') else ''
+            if aura:
+                state = 'Equipped "%s"' % aura
+            elif self.running:
+                state = 'Macro running'
+            else:
+                state = "Sol's RNG"
+            slug = biome_slug(biome) or 'normal'
+            if slug == 'sand_storm':
+                slug = 'sandstorm'
+            presence.set_activity({
+                'details': label,
+                'state': state,
+                'timestamps': {'start': int(getattr(self, '_biome_since', time.time()))},
+                'assets': {
+                    'large_image': slug,
+                    'large_text': label,
+                    'small_text': 'Veyra',
+                },
+            })
+        except Exception as e:
+            note('discord', 'presence update failed: %s: %s' % (type(e).__name__, e))
+
+    def wants_lite(self):
+        """Light HUD and slower clicks. Auto follows RAM and CPU unless Settings overrides it."""
+        mode = self.cfg_str('perf_mode', 'auto')
+        if mode == 'full':
+            return False
+        if mode == 'lite':
+            return True
+        prof = game.machine_profile()
+        return bool(prof.get('lite')) or self.cfg_bool('low_end')
+
+    def pc_info(self):
+        prof = game.machine_profile()
+        lite = self.wants_lite()
+        return {
+            'ram_gb': prof.get('ram_gb') or 0,
+            'cores': prof.get('cores') or 0,
+            'cpu': prof.get('cpu') or '',
+            'hardware_lite': bool(prof.get('lite')),
+            'lite': lite,
+            'fx': self.cfg_bool('fx_on', True) and not lite,
+        }
 
     def build_state(self):
         with self._lock:
@@ -1138,7 +1483,12 @@ class MacroEngine:
                 uptime = '00:00:00'
 
             r_up = game.find_roblox_window() is not None
-            bnow = base_biome(self.biome_now or 'NORMAL') or 'NORMAL'
+            prev = self._preview_biome
+            if prev and time.monotonic() < prev[1]:
+                bnow = prev[0]
+            else:
+                self._preview_biome = None
+                bnow = base_biome(self.biome_now or 'NORMAL') or 'NORMAL'
             r, g, b = biome_rgb(bnow)
             biomes_meta = {
                 k: {
@@ -1148,15 +1498,17 @@ class MacroEngine:
                 }
                 for k in BIOME_COLOURS
             }
+            source = self._log_hist if self._log_hist else self._history
             hist = [
                 {
                     'biome': h_item['biome'],
                     'pretty': pretty(h_item['biome']),
                     'time': h_item['time'],
+                    'day': h_item.get('day') or '',
                     'rare': is_rare(h_item['biome']),
                     'img': biome_web_path(h_item['biome']),
                 }
-                for h_item in reversed(self._history[-25:])
+                for h_item in reversed(source[-40:])
             ]
             biome_counts = [
                 {
@@ -1173,6 +1525,7 @@ class MacroEngine:
             biome_counts_total = int(sum(item['count'] for item in biome_counts))
             with _log_lock:
                 logs = [{'ts': ts, 'tag': tag, 'msg': msg} for ts, tag, msg in _recent_logs[-100:]]
+            supp = self.support_status()
 
             return {
                 'cfg': json.loads(json.dumps(self.cfg)),
@@ -1200,6 +1553,11 @@ class MacroEngine:
                 'biomes': biomes_meta,
                 'history': hist,
                 'logs': logs,
+                'support': supp,
+                'version': VERSION,
+                'update_info': dict(self.update_info),
+                'discord_status': self.presence.status() if self.presence is not None else {'status': 'off', 'detail': ''},
+                'pc': self.pc_info(),
             }
 
     # --------------------------------------------------------------- Plumbing / Notices
@@ -1238,7 +1596,7 @@ class MacroEngine:
             self.phase('idle', DIM)
             if self._key_stop:
                 self._key_stop = False
-                self.notice('MMacro: stopped', DIM)
+                self.notice('Veyra: stopped', DIM)
             if self.start_again:
                 self.start_again = False
                 threading.Timer(0.2, self.start).start()
@@ -1252,14 +1610,14 @@ class MacroEngine:
     def _key_notice(self, kw):
         if kw.get('action') == 'start':
             if self.running and game.ABORT:
-                self.notice('MMacro: stopping - starts again right after', DIM)
+                self.notice('Veyra: stopping - starts again right after', DIM)
             elif self.running:
-                self.notice('MMacro is already running  (F2 stops it)', ACCENT)
+                self.notice('Veyra is already running  (F2 stops it)', ACCENT)
             else:
-                self.notice('MMacro: starting', GOOD, 1200)
+                self.notice('Veyra: starting', GOOD, 1200)
         elif kw.get('action') == 'stop':
             self._key_stop = self.running
-            self.notice('MMacro: stopping' if self.running else 'MMacro is not running  (F1 starts it)',
+            self.notice('Veyra: stopping' if self.running else 'Veyra is not running  (F1 starts it)',
                         BAD if self.running else DIM)
 
     def _poll_hotkeys(self):
@@ -1406,7 +1764,8 @@ class MacroEngine:
 
     def _read_line(self, line, url, watcher, last_aura):
         biome = game.biome_from_line(line) if line else None
-        self.biome_now = biome.upper() if biome else self.biome_now
+        if biome:
+            self._touch_biome(biome.upper())
         aura = game.aura_from_line(line) if line and (self.clipper or self.equip_aura) else None
         if aura == '_None_' and (last_aura is None or time.monotonic() - self.joined_at < JOIN_NONE_S):
             aura = None
@@ -1444,6 +1803,7 @@ class MacroEngine:
             times = (time.time() - self.run_wall, time.monotonic() - self.joined_at) if self.running else (None, None)
             post_biome(url, name, ping=alert, server=server, running=times[0], here=times[1])
             self._set(biome=(pretty(name), ACCENT if alert else DIM))
+        self.refresh_discord()
         return last_aura
 
     def clip_aura(self, aura, line):
@@ -1467,15 +1827,16 @@ class MacroEngine:
 
     # --------------------------------------------------------------- Actions
     def start(self):
-        if self.running:
+        if self.running or self.updating:
             return None
+        self.ran = True
         self.server_link = game.tidy_link(self.cfg_str('private_server'))
         self.cfg['private_server'] = self.server_link
         self.reconnect_on = self.cfg_bool('auto_reconnect')
         self.played = False
         self.item_due = {}
         self.browser_rejoin = self.cfg_bool('rejoin_browser')
-        self.slow_pc = self.cfg_bool('low_end')
+        self.slow_pc = self.wants_lite()
         if self.reconnect_on and not game.deeplink(self.server_link):
             self.phase('auto reconnect needs a private server link', BAD)
             msg = 'Auto reconnect is on - paste a Roblox private server link on the Settings tab.'
@@ -1591,6 +1952,7 @@ class MacroEngine:
 
     def play(self):
         game.ABORT = False
+        game.forget_user_input()
         game.arm()
         game.fresh_session()
         game.set_pace(2.0 if self.slow_pc else 1.0)
@@ -1823,7 +2185,7 @@ class MacroEngine:
             if gap > SLEPT_S:
                 self.beat = time.monotonic()
                 note('run', 'the PC was asleep for %d minutes: nothing ran' % round(gap / 60))
-                self.tell('PC was asleep', 'Nothing ran for %d minutes. MMacro keeps the PC awake, but not through a '
+                self.tell('PC was asleep', 'Nothing ran for %d minutes. Veyra keeps the PC awake, but not through a '
                           'closed lid, Sleep or a flat battery' % round(gap / 60), EMBED_BAD)
             watch = self.watch
             if watch is not None and not self.rejoining and self.need_rejoin is None:
@@ -2489,6 +2851,19 @@ class MacroEngine:
         except Exception as e:
             note('menus', 'closing menus failed: %s: %s' % (type(e).__name__, e))
 
+    def _watch_user_pc(self):
+        """Stop the run when the person at the PC moves the mouse or presses a key."""
+        while not self._closing:
+            try:
+                if (self.running and not game.ABORT and self.cfg_bool('yield_pc', True)
+                        and game.user_took_over()):
+                    note('run', 'you used the PC: stopping')
+                    self.notice('You used the PC, so the macro stopped', ACCENT, 5000)
+                    self.stop()
+            except Exception:
+                pass
+            time.sleep(0.15)
+
     def stop(self):
         note('run', 'Stop pressed')
         self.start_again = False
@@ -2505,10 +2880,16 @@ class MacroEngine:
         self._closing = True
         self.start_again = False
         self.restart_run = False
+        self.stop_support_session()
         game.ABORT = True
         if self.biome_stop is not None:
             self.biome_stop.set()
         self.remember()
+        try:
+            if self.presence is not None:
+                self.presence.close()
+        except Exception:
+            pass
         self.block_on = False
         try:
             with self.block_lock:
@@ -2546,6 +2927,10 @@ class Api:
                     if not self.engine.block_on:
                         self.engine.merchant_detect = False
                 self.engine.remember()
+            if any(k in patch for k in ('perf_mode', 'low_end', 'fx_on')):
+                self.engine.slow_pc = self.engine.wants_lite()
+                game.set_pace(2.0 if self.engine.slow_pc else 1.0)
+            self.engine.refresh_discord()
         return self.engine.build_state()
 
     def sync_roblox_profile(self, username):
@@ -2571,7 +2956,12 @@ class Api:
         try:
             got = clipper.capture_keys()
             if got:
-                text = '+'.join(clipper.parse_keys(got))
+                try:
+                    clipper.parse_keys(got)          # validate before saving
+                except ValueError as e:
+                    note('clip', 'ignored invalid combo %s: %s' % (got, e))
+                    return {'ok': False, 'keys': None}
+                text = got
                 with self.engine._lock:
                     self.engine.cfg['clip_keys'] = text
                     self.engine.remember()
@@ -2645,14 +3035,14 @@ class Api:
             embed = {
                 'title': 'Webhook Test Successful',
                 'description': 'Your Discord webhook is connected and ready to receive alerts.',
-                'color': EMBED_GOOD,
+                'color': 0xFFFFFF,
                 'footer': {'text': '%s | Release v%s' % (TITLE, VERSION)},
             }
             files = {}
-            manas = logo_png()
-            if manas:
-                files['manas.png'] = manas
-                embed['thumbnail'] = {'url': 'attachment://manas.png'}
+            mark = logo_png()
+            if mark:
+                files['veyra.png'] = mark
+                embed['thumbnail'] = {'url': 'attachment://veyra.png'}
             payload = {
                 'content': '',
                 'allowed_mentions': {'parse': []},
@@ -2712,10 +3102,57 @@ class Api:
         webbrowser.open(INVITE)
         return {'ok': True}
 
+    def open_my_discord(self):
+        webbrowser.open('https://discord.com/users/1165362974601510942')
+        return {'ok': True}
+
     def clear_logs(self):
         with _log_lock:
             _recent_logs.clear()
         return {'ok': True}
+
+    def open_dev_console(self):
+        try:
+            for cand in (r'D:\mmacro-dev-tool\dev_monitor.py', os.path.join(HERE_DIR, 'dev_monitor.py')):
+                if os.path.isfile(cand):
+                    pyw = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
+                    runner = pyw if os.path.isfile(pyw) else sys.executable
+                    subprocess.Popen([runner, cand], cwd=os.path.dirname(cand))
+                    return {'ok': True}
+        except Exception as e:
+            note('ui', 'failed to open Dev Console: %s: %s' % (type(e).__name__, e))
+        return {'ok': False}
+
+    def preview_biome(self, key='GLITCHED', duration=25.0, send_webhook=False):
+        k = (key or 'NORMAL').strip().upper()
+        if k == 'NORMAL' or k not in BIOME_COLOURS:
+            self.engine._preview_biome = None
+            note('biomes', 'FX preview reset to live biome')
+        else:
+            self.engine._preview_biome = (k, time.monotonic() + max(5.0, float(duration or 25.0)))
+            note('biomes', 'FX preview activated: %s' % pretty(k))
+            if send_webhook:
+                url = clean_url(self.engine.cfg_str('webhook_url'))
+                if url.startswith('https://'):
+                    srv = self.engine.cfg_str('private_server')
+                    post_biome(url, k, ping=True, server=srv, running=0, here=0, sync=False)
+        return self.engine.build_state()
+
+    def check_updates_now(self):
+        self.engine.check_update(manual=True)
+        return self.engine.build_state()
+
+    def start_support(self, relay_url='', allow_input=False):
+        return self.engine.start_support_session(relay_url=relay_url, allow_input=allow_input)
+
+    def stop_support(self):
+        return self.engine.stop_support_session()
+
+    def set_support_input(self, allow_input):
+        with self.engine._support_lock:
+            if self.engine._support:
+                self.engine._support['allow_input'] = bool(allow_input)
+        return self.engine.build_state()
 
     def reset_all_data(self):
         """Wipe user settings, saved coordinates, custom avatar, and biome history for a clean fresh start."""
@@ -2752,7 +3189,7 @@ class Api:
         return self.engine.build_state()
 
 
-# ================================================================ Single Instance & Entrypoint
+# ================================================================ Single Instance, Auto-Updater & Entrypoint
 SWAP_BAT = r"""@echo off
 set sys=%SystemRoot%\System32
 set n=0
@@ -2780,6 +3217,848 @@ if "%MMACRO_ZIP%"=="1" del "%MMACRO_NEW%"
 start "" "%MMACRO_EXE%"
 del "%~f0"
 """
+
+SWAP_SRC_BAT = r"""@echo off
+set sys=%SystemRoot%\System32
+set n=0
+:wait
+"%sys%\tasklist.exe" /FI "PID eq %MMACRO_PID%" 2>nul | "%sys%\find.exe" "%MMACRO_PID%" >nul || goto copyfiles
+set /a n+=1
+if %n% geq 30 goto copyfiles
+"%sys%\PING.EXE" -n 2 127.0.0.1 >nul
+goto wait
+:copyfiles
+xcopy "%MMACRO_SRC%\*" "%MMACRO_DIR%\" /E /Y /I /Q >nul 2>&1
+rmdir /S /Q "%MMACRO_TMP%" >nul 2>&1
+start "" /D "%MMACRO_DIR%" "%MMACRO_PY%" "%MMACRO_APP%"
+del "%~f0"
+"""
+
+
+def _version_tuple(text):
+    nums = [int(n) for n in re.findall(r'\d+', text or '')[:3]]
+    while len(nums) < 3:
+        nums.append(0)
+    return tuple(nums)
+
+
+def _folder_build():
+    return getattr(sys, 'frozen', False) and os.path.isdir(os.path.join(os.path.dirname(sys.executable), '_internal'))
+
+
+def _can_write_dir(folder):
+    probe = os.path.join(folder, '.mmacro_write_test')
+    try:
+        with open(probe, 'wb') as f:
+            f.write(b'0')
+        os.remove(probe)
+        return True
+    except OSError:
+        return False
+
+
+def _fetch_latest_release():
+    req = urllib.request.Request(RELEASES, headers={'User-Agent': TITLE, 'Accept': 'application/vnd.github+json'})
+    with urllib.request.urlopen(req, timeout=12) as r:
+        data = json.load(r)
+    releases = data if isinstance(data, list) else ([data] if isinstance(data, dict) else [])
+    ext = '.zip' if _folder_build() else '.exe'
+    candidates = []
+    for rel in releases:
+        if not isinstance(rel, dict) or rel.get('draft'):
+            continue
+        assets = rel.get('assets', []) or []
+        asset = next((a for a in assets if a.get('name', '').lower().endswith(ext)), None)
+        if asset is None and ext == '.exe':
+            asset = next((a for a in assets if 'mmacro' in a.get('name', '').lower() and a.get('name', '').lower().endswith('.exe')), None)
+        if asset:
+            tag = rel.get('tag_name', '')
+            candidates.append((_version_tuple(tag), tag, asset['browser_download_url'], int(asset.get('size') or 0)))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    _, tag, url, size = candidates[0]
+    return (tag, url, size)
+
+
+def _fetch_remote_source_version():
+    req = urllib.request.Request(SOURCE_VERSION_URL, headers={'User-Agent': TITLE})
+    with urllib.request.urlopen(req, timeout=12) as r:
+        head = r.read(24000).decode('utf-8', errors='replace')
+    m = re.search(r"^VERSION\s*=\s*['\"]([^'\"]+)['\"]", head, re.M)
+    return m.group(1) if m else None
+
+
+def _download_file(url, dest, expected_size=0, progress_cb=None, min_bytes=0):
+    got = 0
+    req = urllib.request.Request(url, headers={'User-Agent': TITLE})
+    try:
+        with urllib.request.urlopen(req, timeout=45) as r, open(dest, 'wb') as f:
+            total = expected_size or int(r.headers.get('Content-Length') or 0)
+            while True:
+                chunk = r.read(1 << 16)
+                if not chunk:
+                    break
+                f.write(chunk)
+                got += len(chunk)
+                if total and progress_cb:
+                    progress_cb(min(1.0, got / total))
+        if expected_size and got != expected_size:
+            raise IOError('download incomplete (%d of %d bytes)' % (got, expected_size))
+        if min_bytes and got < min_bytes:
+            raise IOError('download too small (%d bytes)' % got)
+    except Exception:
+        try:
+            if os.path.exists(dest):
+                os.remove(dest)
+        except OSError:
+            pass
+        raise
+    try:
+        zi = dest + ':Zone.Identifier'
+        if os.path.exists(zi):
+            os.remove(zi)
+    except OSError:
+        pass
+
+
+def _install_exe_update(new_path, exe_path, pid, zipped):
+    bat = os.path.join(tempfile.gettempdir(), 'mmacro_update_%d.bat' % pid)
+    with open(bat, 'w', encoding='ascii') as f:
+        f.write(SWAP_BAT)
+    env = {k: v for k, v in os.environ.items() if not k.upper().startswith(('_PYI_', '_MEIPASS'))}
+    env.update(
+        PYINSTALLER_RESET_ENVIRONMENT='1',
+        MMACRO_NEW=new_path,
+        MMACRO_EXE=exe_path,
+        MMACRO_DIR=os.path.dirname(exe_path),
+        MMACRO_PID=str(pid),
+        MMACRO_ZIP='1' if zipped else '0',
+    )
+    subprocess.Popen(['cmd', '/c', bat], env=env, creationflags=0x08000000 | 0x00000200, close_fds=True)
+
+
+def _install_source_update(src_root, dest_dir, tmp_dir, pid):
+    bat = os.path.join(tempfile.gettempdir(), 'mmacro_src_update_%d.bat' % pid)
+    with open(bat, 'w', encoding='ascii') as f:
+        f.write(SWAP_SRC_BAT)
+    env = dict(os.environ)
+    env.update(
+        MMACRO_SRC=src_root,
+        MMACRO_DIR=dest_dir,
+        MMACRO_TMP=tmp_dir,
+        MMACRO_PY=sys.executable,
+        MMACRO_APP=os.path.join(dest_dir, 'app.py'),
+        MMACRO_PID=str(pid),
+    )
+    subprocess.Popen(['cmd', '/c', bat], env=env, creationflags=0x08000000 | 0x00000200, close_fds=True)
+
+
+def _attach_auto_updater():
+    """Attach update checker & auto-installer method cleanly onto MacroEngine."""
+
+    def _set_upd(self, state, msg, progress=0, latest=''):
+        self.update_info = {
+            'state': state,
+            'msg': msg,
+            'progress': int(progress),
+            'latest': latest or VERSION,
+        }
+
+    def check_update(self, manual=False):
+        if os.environ.get('MMACRO_SKIP_AUTO_UPDATE') == '1':
+            return
+        if getattr(self, '_checking_update', False) or self.updating:
+            return
+        self._checking_update = True
+        self.update_info = {'state': 'checking', 'msg': 'Checking for updates...', 'progress': 0, 'latest': VERSION}
+
+        def worker():
+            try:
+                tries = 1 if manual else 3
+                frozen = getattr(sys, 'frozen', False)
+                found = None
+                remote_ver = None
+                for attempt in range(tries):
+                    try:
+                        if frozen:
+                            found = _fetch_latest_release()
+                            remote_ver = found[0] if found else VERSION
+                        else:
+                            remote_ver = _fetch_remote_source_version()
+                            if not remote_ver:
+                                rel = _fetch_latest_release()
+                                remote_ver = rel[0] if rel else VERSION
+                        break
+                    except Exception as e:
+                        note('update', 'check failed (try %d of %d): %s: %s' % (attempt + 1, tries, type(e).__name__, e))
+                        if attempt + 1 < tries:
+                            time.sleep(10)
+                        else:
+                            _set_upd(self, 'error', 'Update check failed (%s)' % type(e).__name__)
+                            return
+
+                if not remote_ver or _version_tuple(remote_ver) <= _version_tuple(VERSION):
+                    note('update', 'up to date (v%s)' % VERSION)
+                    _set_upd(self, 'uptodate', 'Up to date (v%s)' % VERSION, 100, remote_ver or VERSION)
+                    return
+
+                clean_tag = remote_ver.lstrip('v')
+                note('update', 'new update v%s found (current v%s)' % (clean_tag, VERSION))
+                if not manual and (not self.cfg_bool('auto_update', True) or self.running or self.ran):
+                    _set_upd(self, 'available', 'Update v%s ready' % clean_tag, 0, clean_tag)
+                    return
+
+                target_dir = os.path.dirname(sys.executable) if frozen else HERE_DIR
+                if not _can_write_dir(target_dir):
+                    note('update', 'folder is read-only (%s): open %s' % (target_dir, RELEASE_PAGE))
+                    _set_upd(self, 'readonly', 'v%s ready — folder locked' % clean_tag, 0, clean_tag)
+                    return
+
+                self.updating = True
+                if frozen:
+                    tag, url, size = found
+                    zipped = url.lower().endswith('.zip')
+                    new_path = os.path.join(tempfile.gettempdir(), 'MMacro_update.zip') if zipped else sys.executable + '.new'
+                    _set_upd(self, 'downloading', 'Updating to v%s (0%%)...' % clean_tag, 0, clean_tag)
+                    self.phase('updating to v%s...' % clean_tag, ACCENT)
+                    note('update', 'downloading %s' % url)
+                    _download_file(
+                        url, new_path, expected_size=size,
+                        progress_cb=lambda f: _set_upd(self, 'downloading', 'Updating to v%s (%d%%)...' % (clean_tag, round(f * 100)), round(f * 100), clean_tag),
+                        min_bytes=100_000,
+                    )
+                    if self.running or self.ran:
+                        self.updating = False
+                        _set_upd(self, 'available', 'v%s downloaded — restart to apply' % clean_tag, 100, clean_tag)
+                        return
+                    _set_upd(self, 'restarting', 'Installing v%s & restarting...' % clean_tag, 100, clean_tag)
+                    note('update', 'installing v%s and restarting...' % clean_tag)
+                    _install_exe_update(new_path, sys.executable, os.getpid(), zipped)
+                    self.close()
+                else:
+                    import zipfile
+                    tmp_dir = tempfile.mkdtemp(prefix='mmacro_src_upd_')
+                    zip_path = os.path.join(tmp_dir, 'update.zip')
+                    _set_upd(self, 'downloading', 'Updating source to v%s...' % clean_tag, 10, clean_tag)
+                    self.phase('updating to v%s...' % clean_tag, ACCENT)
+                    note('update', 'downloading source update %s' % SOURCE_ZIP_URL)
+                    _download_file(
+                        SOURCE_ZIP_URL, zip_path,
+                        progress_cb=lambda f: _set_upd(self, 'downloading', 'Updating to v%s (%d%%)...' % (clean_tag, round(f * 100)), round(f * 100), clean_tag),
+                        min_bytes=10_000,
+                    )
+                    extract_dir = os.path.join(tmp_dir, 'ext')
+                    with zipfile.ZipFile(zip_path, 'r') as zf:
+                        zf.extractall(extract_dir)
+                    roots = [os.path.join(extract_dir, d) for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
+                    src_root = roots[0] if roots and os.path.isfile(os.path.join(roots[0], 'app.py')) else extract_dir
+                    if not os.path.isfile(os.path.join(src_root, 'app.py')):
+                        raise RuntimeError('Downloaded archive missing app.py')
+                    if self.running or self.ran:
+                        self.updating = False
+                        _set_upd(self, 'available', 'v%s ready — restart to apply' % clean_tag, 100, clean_tag)
+                        return
+                    _set_upd(self, 'restarting', 'Installing v%s & restarting...' % clean_tag, 100, clean_tag)
+                    note('update', 'applying source update v%s and restarting...' % clean_tag)
+                    _install_source_update(src_root, HERE_DIR, tmp_dir, os.getpid())
+                    self.close()
+            except Exception as e:
+                note('update', 'auto-update failed: %s: %s' % (type(e).__name__, e))
+                self.updating = False
+                _set_upd(self, 'error', 'Update failed (%s)' % type(e).__name__)
+            finally:
+                self._checking_update = False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    MacroEngine.check_update = check_update
+
+
+_attach_auto_updater()
+
+
+def _attach_support_host():
+    """Attach consent-gated live Support Code session (logs, screen & macro controls) onto MacroEngine."""
+
+    def support_status(self):
+        with self._support_lock:
+            s = self._support
+            if not s or not s.get('active'):
+                return {
+                    'active': False, 'code': '', 'local_url': '', 'lan_url': '',
+                    'relay_url': os.environ.get('MMACRO_RELAY_URL', ''),
+                    'allow_input': False, 'connected_dev': None, 'expires_in': 0,
+                }
+            exp_in = max(0, int(support_link.SESSION_TTL_S - (time.time() - s['started_at'])))
+            return {
+                'active': True,
+                'code': s['code'],
+                'local_url': s['local_url'],
+                'lan_url': s['lan_url'],
+                'relay_url': s['relay_url'],
+                'allow_input': bool(s['allow_input']),
+                'connected_dev': s.get('connected_dev'),
+                'expires_in': exp_in,
+            }
+
+    def _macro_window_bbox(self):
+        try:
+            hwnd = getattr(self, '_hwnd', None) or _find_own_hwnd()
+            if not hwnd:
+                return None
+            rect = wintypes.RECT()
+            if not ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+                return None
+            if rect.right <= rect.left or rect.bottom <= rect.top:
+                return None
+            # keep on-screen-ish bounds
+            sw = ctypes.windll.user32.GetSystemMetrics(78) or ctypes.windll.user32.GetSystemMetrics(0)
+            sh = ctypes.windll.user32.GetSystemMetrics(79) or ctypes.windll.user32.GetSystemMetrics(1)
+            l = max(-50, int(rect.left)); t = max(-50, int(rect.top))
+            r = min(int(sw) + 50, int(rect.right)); b = min(int(sh) + 50, int(rect.bottom))
+            if r - l < 80 or b - t < 80:
+                return None
+            return (l, t, r, b)
+        except Exception:
+            return None
+
+    def _support_allowed_roots(self):
+        roots = []
+        try:
+            roots.append(os.path.realpath(HERE_DIR))
+        except Exception:
+            pass
+        try:
+            roots.append(os.path.realpath(game.APP_DIR))
+        except Exception:
+            pass
+        # dedupe while preserving order
+        out = []
+        seen = set()
+        for r in roots:
+            k = os.path.normcase(r)
+            if r and k not in seen:
+                seen.add(k)
+                out.append(r)
+        return out or [os.path.realpath('.')]
+
+    def _support_resolve_path(self, raw, for_write=False):
+        roots = self._support_allowed_roots()
+        if not roots:
+            return None, 'No allowed roots'
+        base = roots[0]
+        raw = (raw or '').strip()
+        # allow passing an absolute path only if it falls inside an allowed root
+        if raw and os.path.isabs(raw):
+            target = os.path.realpath(raw)
+        else:
+            # treat empty/relative as relative to macro project root (HERE_DIR)
+            target = os.path.realpath(os.path.join(base, raw or '.'))
+
+        def _inside(path, root):
+            try:
+                return os.path.commonpath([os.path.normcase(path), os.path.normcase(root)]) == os.path.normcase(root)
+            except Exception:
+                return False
+
+        if not any(_inside(target, r) for r in roots):
+            return None, 'Access denied (outside allowed macro folders)'
+        # block symlink/junction escapes where possible
+        try:
+            cur = target
+            stop = None
+            for r in roots:
+                if _inside(cur, r):
+                    stop = os.path.normcase(r)
+                    break
+            probe = cur
+            while probe:
+                pk = os.path.normcase(probe)
+                if stop and pk == stop:
+                    break
+                if os.path.islink(probe):
+                    realp = os.path.realpath(probe)
+                    if not any(_inside(realp, r) for r in roots):
+                        return None, 'Access denied (symlink outside allowed folders)'
+                parent = os.path.dirname(probe)
+                if parent == probe:
+                    break
+                probe = parent
+        except Exception:
+            pass
+        if for_write:
+            # require parent directory to be inside roots (creation of new files allowed)
+            parent = os.path.dirname(target) or target
+            if not any(_inside(os.path.realpath(parent), r) for r in roots):
+                return None, 'Access denied (outside allowed macro folders)'
+        return target, None
+
+    def _safe_snapshot(self, sess):
+        with self._lock:
+            cfg_safe = json.loads(json.dumps(self.cfg))
+            if cfg_safe.get('webhook_url'):
+                cfg_safe['webhook_url'] = 'https://discord.com/api/webhooks/[REDACTED]'
+            if cfg_safe.get('private_server'):
+                cfg_safe['private_server'] = _sanitize_log_text(cfg_safe['private_server'])
+            snap_meta = {
+                'version': VERSION,
+                'player_name': self.player_name,
+                'running': self.running,
+                'phase': self.phase_text,
+                'biome_now': self.biome_now,
+                'roblox_up': game.find_roblox_window() is not None,
+                'allow_input': bool(sess.get('allow_input')),
+                'cfg': cfg_safe,
+            }
+        with _log_lock:
+            snap_meta['logs'] = [{'ts': ts, 'tag': tag, 'msg': _sanitize_log_text(msg)} for ts, tag, msg in _recent_logs[-120:]]
+        snap_meta['ai_alerts'] = []       # AI Log Doctor removed; field kept for dev-tool compatibility
+        # Remote view/control is limited to the Roblox client or the Veyra window (no unrelated desktop capture).
+        rb_box = None
+        try:
+            if game.roblox_window() is not None:
+                b = game.client_box((0.0, 0.0, 1.0, 1.0))
+                if b and b[2] > b[0] and b[3] > b[1]:
+                    rb_box = b
+        except Exception:
+            rb_box = None
+        macro_box = None if rb_box else _macro_window_bbox(self)
+        target_box = rb_box or macro_box
+        scope = 'roblox' if rb_box else ('macro' if macro_box else 'none')
+        dev_on = bool(sess.get('connected_dev'))
+        snap_meta['screen_b64'] = support_link.capture_screen_b64(
+            max_w=800 if dev_on else 640,
+            quality=42 if dev_on else 32,
+            bbox=target_box,
+        ) if target_box else ''
+        snap_meta['screen_scope'] = scope
+        snap_meta['control_target'] = scope
+        snap_meta['ts'] = time.strftime('%H:%M:%S')
+        return snap_meta
+
+    def _exec_support_cmd(self, sess, item):
+        cmd = item.get('cmd', '')
+        args = item.get('args') or {}
+        dev = item.get('dev', 'dev')
+        if cmd not in support_link.ALLOWED_CMDS:
+            return {'ok': False, 'error': 'Command not allowed'}
+        note('support', 'dev %s executed %s' % (dev, cmd))
+        try:
+            if cmd == 'start_macro':
+                self.start()
+                return {'ok': True}
+            elif cmd == 'stop_macro':
+                self.stop()
+                return {'ok': True}
+            elif cmd == 'heal_screen':
+                self.ai_heal_screen('dev:%s' % dev)
+                return {'ok': True}
+            elif cmd == 'check_chat':
+                self.check_chat_on_start()
+                return {'ok': True}
+            elif cmd == 'preview_biome':
+                k = str(args.get('key') or 'NORMAL').upper()
+                self._preview_biome = None if (k == 'NORMAL' or k not in BIOME_COLOURS) else (k, time.monotonic() + 25.0)
+                return {'ok': True}
+            elif cmd == 'update_cfg':
+                note('support', 'dev %s attempted disabled command update_cfg' % dev)
+                return {'ok': False, 'error': 'update_cfg disabled'}
+            elif cmd == 'roblox_click':
+                if not sess.get('allow_input'):
+                    return {'ok': False, 'error': 'Remote click/key not enabled by user'}
+                # Prefer Roblox client when available; fall back to Veyra window for macro-only control.
+                if game.roblox_window() is not None:
+                    box = game.client_box((0.0, 0.0, 1.0, 1.0))
+                    if box and box[2] > box[0] and box[3] > box[1]:
+                        nx = max(0.0, min(1.0, float(args.get('nx', 0.5))))
+                        ny = max(0.0, min(1.0, float(args.get('ny', 0.5))))
+                        px = int(box[0] + nx * (box[2] - box[0]))
+                        py = int(box[1] + ny * (box[3] - box[1]))
+                        game.take_foreground(tries=1)
+                        game.click(px, py)
+                        return {'ok': True, 'target': 'roblox'}
+                box = _macro_window_bbox(self)
+                if box and box[2] > box[0] and box[3] > box[1]:
+                    nx = max(0.0, min(1.0, float(args.get('nx', 0.5))))
+                    ny = max(0.0, min(1.0, float(args.get('ny', 0.5))))
+                    px = int(box[0] + nx * (box[2] - box[0]))
+                    py = int(box[1] + ny * (box[3] - box[1]))
+                    hwnd = getattr(self, '_hwnd', None) or _find_own_hwnd()
+                    try:
+                        if hwnd:
+                            game.force_foreground(hwnd)
+                            time.sleep(0.08)
+                    except Exception:
+                        pass
+                    try:
+                        game.move_to(px, py, 0.02)
+                        game.button('left', True); time.sleep(0.05); game.button('left', False)
+                    except Exception:
+                        game._mouse(game.BTN_DOWN['left'])
+                        time.sleep(0.05)
+                        game._mouse(game.BTN_UP['left'])
+                    return {'ok': True, 'target': 'macro'}
+                return {'ok': False, 'error': 'No Roblox or Veyra window found'}
+            elif cmd == 'roblox_key':
+                if not sess.get('allow_input'):
+                    return {'ok': False, 'error': 'Remote click/key not enabled by user'}
+                key = str(args.get('key') or '').strip()[:24]
+                if not key:
+                    return {'ok': False, 'error': 'No key provided'}
+                if game.roblox_window() is not None:
+                    game.take_foreground(tries=1)
+                    game.tap(key)
+                    return {'ok': True, 'target': 'roblox'}
+                hwnd = getattr(self, '_hwnd', None) or _find_own_hwnd()
+                if hwnd:
+                    try:
+                        game.force_foreground(hwnd)
+                        time.sleep(0.08)
+                    except Exception:
+                        pass
+                    # Map simple key names to pynput Key when possible, else send as char(s)
+                    try:
+                        from pynput.keyboard import Key
+                        kmap = {
+                            'esc': Key.esc, 'escape': Key.esc, 'enter': Key.enter, 'return': Key.enter,
+                            'tab': Key.tab, 'space': Key.space, 'backspace': Key.backspace,
+                            'up': Key.up, 'down': Key.down, 'left': Key.left, 'right': Key.right,
+                            'home': Key.home, 'end': Key.end, 'pageup': Key.page_up, 'pagedown': Key.page_down,
+                            'delete': Key.delete, 'f1': Key.f1, 'f2': Key.f2, 'f3': Key.f3, 'f4': Key.f4,
+                            'f5': Key.f5, 'f6': Key.f6, 'f7': Key.f7, 'f8': Key.f8, 'f9': Key.f9,
+                            'f10': Key.f10, 'f11': Key.f11, 'f12': Key.f12,
+                        }
+                        k = kmap.get(key.lower(), key if len(key) == 1 else getattr(Key, key.lower(), key))
+                        with game.INPUT_LOCK:
+                            game.kb.press(k); time.sleep(0.03); game.kb.release(k)
+                        return {'ok': True, 'target': 'macro'}
+                    except Exception as ex:
+                        return {'ok': False, 'error': 'Failed to send key: %s' % ex}
+                return {'ok': False, 'error': 'No Roblox or Veyra window found'}
+
+            # --- Remote macro file operations (sandboxed to macro dir + app data) ---
+            elif cmd == 'list_dir':
+                p, err = self._support_resolve_path(args.get('path', '.'))
+                if err:
+                    return {'ok': False, 'error': err}
+                if not os.path.isdir(p):
+                    return {'ok': False, 'error': 'Not a directory'}
+                root0 = self._support_allowed_roots()[0]
+                items = []
+                try:
+                    with os.scandir(p) as it:
+                        for e in it:
+                            try:
+                                st = e.stat(follow_symlinks=False)
+                                items.append({
+                                    'name': e.name,
+                                    'type': 'dir' if e.is_dir(follow_symlinks=False) else 'file',
+                                    'size': st.st_size,
+                                    'mtime': int(st.st_mtime),
+                                })
+                            except Exception:
+                                pass
+                except Exception as ex:
+                    return {'ok': False, 'error': str(ex)}
+                items.sort(key=lambda x: (0 if x['type'] == 'dir' else 1, x['name'].lower()))
+                rel = os.path.relpath(p, root0)
+                if rel == '.':
+                    rel = ''
+                return {'ok': True, 'path': p, 'rel': rel, 'items': items, 'roots': self._support_allowed_roots()}
+            elif cmd == 'read_file':
+                p, err = self._support_resolve_path(args.get('path', ''))
+                if err:
+                    return {'ok': False, 'error': err}
+                if not os.path.isfile(p):
+                    return {'ok': False, 'error': 'Not a file'}
+                max_bytes = int(args.get('max_bytes') or 300000)
+                max_bytes = max(1024, min(max_bytes, 1000000))
+                try:
+                    with open(p, 'rb') as f:
+                        raw = f.read(max_bytes + 1)
+                except Exception as ex:
+                    return {'ok': False, 'error': str(ex)}
+                truncated = len(raw) > max_bytes
+                if truncated:
+                    raw = raw[:max_bytes]
+                is_text = b'\x00' not in raw[:4096]
+                if is_text:
+                    content = raw.decode('utf-8', errors='replace')
+                    enc = 'utf-8'
+                else:
+                    content = base64.b64encode(raw).decode('ascii')
+                    enc = 'base64'
+                try:
+                    st = os.stat(p)
+                    size = st.st_size
+                    mtime = int(st.st_mtime)
+                except Exception:
+                    size = len(raw)
+                    mtime = 0
+                return {'ok': True, 'path': p, 'content': content, 'encoding': enc, 'truncated': truncated, 'size': size, 'mtime': mtime}
+            elif cmd == 'write_file':
+                p, err = self._support_resolve_path(args.get('path', ''), for_write=True)
+                if err:
+                    return {'ok': False, 'error': err}
+                content = args.get('content')
+                if content is None:
+                    return {'ok': False, 'error': 'No content'}
+                encoding = (args.get('encoding') or 'utf-8').lower()
+                try:
+                    os.makedirs(os.path.dirname(p) or '.', exist_ok=True)
+                    if encoding == 'base64':
+                        data = base64.b64decode(content)
+                    else:
+                        data = str(content).replace('\r\n', '\n').replace('\r', '\n').encode('utf-8')
+                    with open(p, 'wb') as f:
+                        f.write(data)
+                except Exception as ex:
+                    return {'ok': False, 'error': str(ex)}
+                return {'ok': True, 'path': p, 'bytes': len(data)}
+            elif cmd == 'make_dir':
+                p, err = self._support_resolve_path(args.get('path', ''), for_write=True)
+                if err:
+                    return {'ok': False, 'error': err}
+                try:
+                    os.makedirs(p, exist_ok=True)
+                except Exception as ex:
+                    return {'ok': False, 'error': str(ex)}
+                return {'ok': True, 'path': p}
+            elif cmd == 'delete_path':
+                p, err = self._support_resolve_path(args.get('path', ''), for_write=True)
+                if err:
+                    return {'ok': False, 'error': err}
+                roots = self._support_allowed_roots()
+                if any(os.path.normcase(p) == os.path.normcase(r) for r in roots):
+                    return {'ok': False, 'error': 'Cannot delete a root folder'}
+                try:
+                    if os.path.isdir(p) and not os.path.islink(p):
+                        shutil.rmtree(p)
+                    elif os.path.exists(p):
+                        os.remove(p)
+                    else:
+                        return {'ok': False, 'error': 'Not found'}
+                except Exception as ex:
+                    return {'ok': False, 'error': str(ex)}
+                return {'ok': True, 'path': p}
+
+            return {'ok': True}
+        except Exception as e:
+            note('support', 'command %s error: %s: %s' % (cmd, type(e).__name__, e))
+            return {'ok': False, 'error': '%s: %s' % (type(e).__name__, e)}
+
+    def start_support_session(self, relay_url='', allow_input=False):
+        self.stop_support_session()
+        code = support_link.generate_support_code()
+        host_secret = secrets.token_hex(12)
+        store = support_link.RelayStore()
+        stop_evt = threading.Event()
+        relay = (relay_url or os.environ.get('MMACRO_RELAY_URL') or '').strip().rstrip('/')
+
+        # The room code is a bearer secret; throttle it so a LAN caller cannot brute-force it.
+        attempts = {}
+
+        def rate_ok(key, limit=12, window=30.0):
+            now = time.monotonic()
+            recent = [t for t in attempts.get(key, ()) if now - t < window]
+            attempts[key] = recent
+            if len(recent) >= limit:
+                return False
+            recent.append(now)
+            return True
+
+        class _LocalSupportHandler(http.server.BaseHTTPRequestHandler):
+            def _send(self_h, status, data):
+                body = json.dumps(data).encode('utf-8')
+                self_h.send_response(status)
+                self_h.send_header('Content-Type', 'application/json')
+                self_h.send_header('Content-Length', str(len(body)))
+                self_h.end_headers()
+                self_h.wfile.write(body)
+
+            def _read_json(self_h):
+                n = int(self_h.headers.get('Content-Length') or 0)
+                if n <= 0 or n > 2_000_000:
+                    return {}
+                raw = self_h.rfile.read(n).decode('utf-8', errors='replace')
+                return json.loads(raw) if raw else {}
+
+            def do_GET(self_h):
+                path = self_h.path.split('?', 1)[0]
+                m = re.match(r'^/room/([A-Za-z0-9-]+)/pull$', path)
+                if m:
+                    if not rate_ok('pull:%s' % self_h.client_address[0], limit=120):
+                        return self_h._send(429, {'ok': False, 'error': 'Too many requests'})
+                    res = store.pull_dev(m.group(1))
+                    return self_h._send(200 if res.get('ok') else 404, res)
+                m = re.match(r'^/room/([A-Za-z0-9-]+)/result/([A-Za-z0-9]+)$', path)
+                if m:
+                    if not rate_ok('res:%s' % self_h.client_address[0], limit=240):
+                        return self_h._send(429, {'ok': False, 'error': 'Too many requests'})
+                    res = store.get_result(m.group(1), m.group(2))
+                    return self_h._send(200 if res.get('ok') or res.get('pending') else 404, res)
+                self_h._send(404, {'ok': False})
+
+            def do_POST(self_h):
+                path = self_h.path.split('?', 1)[0]
+                m = re.match(r'^/room/([A-Za-z0-9-]+)/(connect|cmd|close)$', path)
+                if not m:
+                    return self_h._send(404, {'ok': False})
+                if self_h.headers.get('Content-Type', '').split(';', 1)[0].strip().lower() != 'application/json':
+                    return self_h._send(415, {'ok': False, 'error': 'JSON required'})
+                if not rate_ok('%s:%s' % (self_h.client_address[0], m.group(2))):
+                    return self_h._send(429, {'ok': False, 'error': 'Too many attempts'})
+                data = self_h._read_json()
+                rc, act = m.group(1), m.group(2)
+                if act == 'connect':
+                    res = store.connect_dev(rc, data.get('dev_username', 'dev'))
+                    return self_h._send(200 if res.get('ok') else 404, res)
+                if act == 'cmd':
+                    res = store.enqueue_cmd(rc, data.get('dev_username', 'dev'), data.get('cmd', ''), data.get('args', {}))
+                    return self_h._send(200 if res.get('ok') else 400, res)
+                return self_h._send(200, store.close_room(rc))
+
+            def log_message(self_h, *args):
+                pass
+
+        class _LocalSrv(socketserver.ThreadingMixIn, http.server.HTTPServer):
+            daemon_threads = True
+
+        # Loopback by default; opt in to LAN with MMACRO_SUPPORT_LAN=1.
+        lan_ok = os.environ.get('MMACRO_SUPPORT_LAN') == '1'
+        srv = _LocalSrv(('0.0.0.0' if lan_ok else '127.0.0.1', 0), _LocalSupportHandler)
+        port = srv.server_address[1]
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        ip = support_link.local_ip()
+        local_url = 'http://127.0.0.1:%d' % port
+        lan_url = 'http://%s:%d' % (ip, port) if lan_ok else ''
+
+        sess = {
+            'active': True,
+            'code': code,
+            'host_secret': host_secret,
+            'relay_url': relay,
+            'local_url': local_url,
+            'lan_url': lan_url,
+            'allow_input': bool(allow_input),
+            'connected_dev': None,
+            'started_at': time.time(),
+            'srv': srv,
+            'store': store,
+            'stop_evt': stop_evt,
+        }
+        with self._support_lock:
+            self._support = sess
+
+        support_link.register_local_session(code, {
+            'code': code, 'local_url': local_url, 'lan_url': lan_url, 'relay_url': relay, 'updated_at': time.time(),
+        })
+        note('support', 'Support session started · code=%s (%s)' % (code, lan_url))
+
+        def _loop():
+            last_dev = None
+            while not stop_evt.is_set() and not self._closing:
+                if time.time() - sess['started_at'] >= support_link.SESSION_TTL_S:
+                    note('support', 'Support code %s expired after 30 min' % code)
+                    break
+                try:
+                    snap = _safe_snapshot(self, sess)
+                    local_res = store.open_or_push(code, host_secret, snap)
+                    cmds = list(local_res.get('commands') or [])
+                    dev = local_res.get('connected_dev')
+                    if local_res.get('closed'):
+                        break
+                    if relay:
+                        try:
+                            r_res = support_link.http_json(
+                                '%s/room/%s/push' % (relay, code),
+                                method='POST',
+                                payload={'host_secret': host_secret, 'snapshot': snap},
+                                timeout=6,
+                            )
+                            cmds.extend(r_res.get('commands') or [])
+                            dev = r_res.get('connected_dev') or dev
+                            if r_res.get('closed'):
+                                break
+                        except Exception:
+                            pass
+                    if dev != last_dev:
+                        last_dev = dev
+                        sess['connected_dev'] = dev
+                        if dev:
+                            note('support', "Developer '%s' connected to your Support Session (%s)" % (dev, code))
+                            self.notice("Dev '%s' connected (Support %s)" % (dev, code), ACCENT, 6000)
+                    results_out = {}
+                    for item in cmds:
+                        try:
+                            r = _exec_support_cmd(self, sess, item)
+                        except Exception as ex:
+                            r = {'ok': False, 'error': str(ex)}
+                        cid = item.get('id')
+                        if cid:
+                            results_out[cid] = r if r is not None else {'ok': True}
+                    if results_out:
+                        try:
+                            store.open_or_push(code, host_secret, {}, results_out)
+                        except Exception:
+                            pass
+                        if relay:
+                            try:
+                                support_link.http_json(
+                                    '%s/room/%s/push' % (relay, code),
+                                    method='POST',
+                                    payload={'host_secret': host_secret, 'snapshot': {}, 'results': results_out},
+                                    timeout=6,
+                                )
+                            except Exception:
+                                pass
+                    support_link.register_local_session(code, {
+                        'code': code, 'local_url': local_url, 'lan_url': lan_url, 'relay_url': relay, 'updated_at': time.time(),
+                    })
+                except Exception:
+                    pass
+                # Faster stream when a dev is connected; slower idle polling to reduce load.
+                stop_evt.wait(0.35 if sess.get('connected_dev') else 1.0)
+            self.stop_support_session()
+
+        threading.Thread(target=_loop, daemon=True).start()
+        return self.build_state()
+
+    def stop_support_session(self):
+        with self._support_lock:
+            sess = self._support
+            self._support = None
+        if not sess:
+            return self.build_state()
+        try:
+            sess['stop_evt'].set()
+        except Exception:
+            pass
+        support_link.unregister_local_session(sess['code'])
+        try:
+            sess['store'].close_room(sess['code'])
+        except Exception:
+            pass
+        if sess.get('relay_url'):
+            try:
+                support_link.http_json('%s/room/%s/close' % (sess['relay_url'], sess['code']), method='POST', payload={}, timeout=3)
+            except Exception:
+                pass
+        try:
+            sess['srv'].shutdown()
+            sess['srv'].server_close()
+        except Exception:
+            pass
+        note('support', 'Support session stopped (%s)' % sess['code'])
+        return self.build_state()
+
+    MacroEngine.support_status = support_status
+    MacroEngine.start_support_session = start_support_session
+    MacroEngine.stop_support_session = stop_support_session
+
+
+_attach_support_host()
 
 UNPACK_MARKS = ('auras.json', 'eden.png', 'gui_points.json')
 
@@ -2820,15 +4099,21 @@ def _clear_old_unpacks():
 def only_one():
     global _one
     k = ctypes.WinDLL('kernel32', use_last_error=True)
-    _one = [k.CreateMutexW(None, False, 'Local\\MMacroHUD')]
-    if ctypes.get_last_error() == 183:
-        return 'MMacro HUD is already open.'
+    k.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+    k.CreateMutexW.restype = ctypes.c_void_p          # 64-bit handles are not c_int
+    ctypes.set_last_error(0)
+    local = k.CreateMutexW(None, False, 'Local\\MMacroHUD')
+    _one = [local]
+    if not local or ctypes.get_last_error() == 183:
+        return 'Veyra is already open.'
     user = re.sub(r'[^\w.-]', '_', os.environ.get('USERDOMAIN', '') + '.' + os.environ.get('USERNAME', ''))
-    _one.append(k.CreateMutexW(None, False, 'Global\\MMacroHUD-' + user))
-    if ctypes.get_last_error() == 183:
-        return ('MMacro HUD is already running for this Windows account in another session (another RDP).\n\n'
-                'Two macros on one account share Roblox\'s logs and MMacro HUD\'s settings, so each RDP needs its own '
-                'Windows account. Log the second RDP into a different account, then open MMacro HUD there.')
+    ctypes.set_last_error(0)
+    glob = k.CreateMutexW(None, False, 'Global\\MMacroHUD-' + user)
+    _one.append(glob)
+    if not glob or ctypes.get_last_error() == 183:
+        return ('Veyra is already running for this Windows account in another session (another RDP).\n\n'
+                'Two macros on one account share Roblox\'s logs and Veyra\'s settings, so each RDP needs its own '
+                'Windows account. Log the second RDP into a different account, then open Veyra there.')
     return None
 
 
@@ -2861,7 +4146,7 @@ def main():
         sys.exit(0)
     why = only_one()
     if why:
-        if why == 'MMacro HUD is already open.' and _focus_existing_mmacro():
+        if why == 'Veyra is already open.' and _focus_existing_mmacro():
             sys.exit(0)
         ctypes.windll.user32.MessageBoxW(0, why, TITLE, 0x40)
         sys.exit(0)
@@ -2869,9 +4154,8 @@ def main():
 
     srv = start_ui_server()
     port = srv.server_address[1]
-    url = 'http://127.0.0.1:%d/ui/index.html' % port
-
     engine = MacroEngine()
+    url = 'http://127.0.0.1:%d/ui/index.html%s' % (port, '?lite=1' if engine.wants_lite() else '')
     api = Api(engine)
 
     window = webview.create_window(
@@ -2893,6 +4177,7 @@ def main():
             _dark_titlebar_hwnd(hwnd)
         except Exception:
             pass
+        engine.check_update()
 
     window.events.shown += on_shown
     window.events.closing += lambda: engine.remember()
@@ -2902,7 +4187,17 @@ def main():
     try:
         webview.start(gui='edgechromium', icon=ico if os.path.isfile(ico) else None, debug=False)
     except Exception:
-        webview.start(debug=False)
+        try:
+            webview.start(debug=False)
+        except Exception as e2:
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                f'Veyra could not open its WebView window.\n\n{e2}\n\n'
+                'Make sure Microsoft Edge WebView2 Runtime is installed and .NET Framework 4.8 is enabled.',
+                TITLE,
+                0x10,
+            )
+            sys.exit(1)
 
 
 if __name__ == '__main__':

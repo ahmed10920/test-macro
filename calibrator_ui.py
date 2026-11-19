@@ -5,6 +5,7 @@ import queue
 import sys
 import threading
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import messagebox
 
 HERE = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
@@ -257,6 +258,41 @@ class CalibrateWindow(tk.Tk):
         self.destroy()
 
 
+# Toast fill, rim, and text for each Settings theme. Black & White stays monochrome.
+_TOAST_THEMES = {
+    'dark': ('#0c1424', '#38bdf8', '#f8fafc'),
+    'white': ('#ffffff', '#0284c7', '#0f172a'),
+    'midnight': ('#161228', '#c4b5fd', '#f5f3ff'),
+    'ember': ('#2a140c', '#fb923c', '#fff7ed'),
+    'forest': ('#0c2418', '#34d399', '#ecfdf5'),
+    'bw': ('#000000', '#ffffff', '#ffffff'),
+}
+
+
+def _toast_look(colour):
+    theme = 'dark'
+    try:
+        saved = (game.load_settings().get('theme') or 'dark')
+        if saved in _TOAST_THEMES:
+            theme = saved
+    except Exception:
+        pass
+    fill, rim, fg = _TOAST_THEMES[theme]
+    if theme != 'bw' and colour == BAD:
+        rim, fg = BAD, '#fff1f2'
+    elif theme != 'bw' and colour == WARN:
+        rim = WARN
+    return fill, rim, fg
+
+
+def _clip_pill(hwnd, width, height):
+    """Clip a borderless window into a capsule. The system owns the region after this."""
+    radius = max(8, height)
+    rgn = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, int(width) + 1, int(height) + 1, radius, radius)
+    if rgn:
+        ctypes.windll.user32.SetWindowRgn(hwnd, rgn, True)
+
+
 class ToastService:
     """Dedicated daemon-thread click-through overlay toast over Roblox."""
 
@@ -280,12 +316,13 @@ class ToastService:
 
         root = tk.Tk()
         root.withdraw()
-        top = tk.Toplevel(root, bg=ACCENT)
+        font = tkfont.Font(root, family=UIB, size=12)
+        top = tk.Toplevel(root, bg='#0c1424')
         top.overrideredirect(True)
         top.attributes('-topmost', True)
-        top.attributes('-alpha', 0.95)
-        label = tk.Label(top, bg=SIDEBAR_BG, fg=TEXT, font=(UIB, 12), padx=24, pady=11, wraplength=720, justify='center')
-        label.pack(padx=1, pady=1)
+        label = tk.Label(top, bg='#0c1424', fg='#f8fafc', font=font, padx=26, pady=11,
+                         wraplength=640, justify='center')
+        label.pack()
         top.withdraw()
         top.update_idletasks()
         hwnd = u32.GetParent(top.winfo_id()) or top.winfo_id()
@@ -301,10 +338,12 @@ class ToastService:
             try:
                 while True:
                     text, colour, ms = self._q.get_nowait()
-                    top.configure(bg=colour if colour in (GOOD, BAD, ACCENT, WARN) else EDGE)
-                    label.configure(text=text, fg=colour)
+                    fill, rim, fg = _toast_look(colour)
+                    top.configure(bg=fill)
+                    label.configure(text=text, bg=fill, fg=rim if colour in (GOOD, ACCENT) else fg)
                     top.update_idletasks()
                     w, h = top.winfo_reqwidth(), top.winfo_reqheight()
+                    _clip_pill(hwnd, w, h)
                     x, y, cw = 0, 0, top.winfo_screenwidth()
                     try:
                         win = game.find_roblox_window()
@@ -312,7 +351,7 @@ class ToastService:
                             x, y, cw, _ = game.client_rect(win)
                     except Exception:
                         pass
-                    place(hwnd, TOPMOST, x + (cw - w) // 2, y + 40, w, h, 0x0010 | 0x0040)
+                    place(hwnd, TOPMOST, x + max(0, (cw - w) // 2), y + 48, w, h, 0x0010 | 0x0040)
                     if job[0] is not None:
                         top.after_cancel(job[0])
                     job[0] = top.after(ms, hide)

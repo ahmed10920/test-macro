@@ -201,7 +201,7 @@ def bitten(within, halt, idle=0):
         return False
     global peak, dipped
     white = cutoff(idle)
-    end = time.perf_counter() + within
+    end = time.perf_counter() + within * game.PACE
     while time.perf_counter() < end and not halt():
         level = min(pixel(icon))
         peak = max(peak, level)
@@ -452,8 +452,18 @@ def _ocr_texts(img, det=True):
     for row in (result or ()):
         if not row:
             continue
+        # Common shapes: [box, text, score], [box, (text, score)], [text, score], etc.
         txt = row[1] if len(row) >= 3 else row[0]
-        if isinstance(txt, str) and txt:
+        if isinstance(txt, (list, tuple)):
+            txt = txt[0] if txt else ''
+        if txt is None:
+            continue
+        if not isinstance(txt, str):
+            try:
+                txt = str(txt)
+            except Exception:
+                continue
+        if txt:
             out.append(txt)
     return out
 
@@ -500,7 +510,8 @@ def read_count():
     texts = _ocr_texts(points.grab('fishingShopSellTab'), det=False)
     if not texts:
         return None
-    nums = re.findall(r'\d+', ' '.join(texts).split('[', 1)[-1])
+    joined = ' '.join(str(t) for t in texts if t is not None)
+    nums = re.findall(r'\d+', joined.split('[', 1)[-1])
     if len(nums) >= 2 and int(nums[0]) <= int(nums[1]):
         _room = nums[1]
         return int(nums[0])

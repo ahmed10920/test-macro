@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 980">
+<rect width="980" height="980" rx="210" fill="#000"/>
+<circle class="part core" cx="489.4" cy="489.3" r="229.9" fill="#fff" style="--delay:0.00s"/>
+<circle class="part dot" cx="152.6" cy="198.5" r="61.6" fill="#fff" style="--delay:1.05s"/>
+<circle class="part dot" cx="688.4" cy="887.3" r="61.6" fill="#fff" style="--delay:1.05s"/>
+</svg>

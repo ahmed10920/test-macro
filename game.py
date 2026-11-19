@@ -6,6 +6,7 @@ import glob
 import json
 import math
 import os
+import platform
 import random
 import re
 from urllib.parse import parse_qs, urlsplit
@@ -34,6 +35,7 @@ DEFAULTS = {
     "cooldown_seconds": 300,
     "auto_items": False,
     "anti_afk": True,
+    "yield_pc": True,
     "clicks": {},
     "private_server": "",
     "auto_reconnect": False,
@@ -57,7 +59,36 @@ DEFAULTS = {
     "clip_on": False,
     "clip_min": "1,000,000,000",
     "clip_quality": "768p",
+    "discord_rpc": True,
+    "theme": "dark",
+    "perf_mode": "auto",       # auto | lite | full — auto follows this PC's RAM and CPU
+    "fx_on": True,
 }
+
+
+def machine_profile():
+    """RAM, CPU, and whether this PC should run the light HUD. Read once."""
+    cached = getattr(machine_profile, '_cached', None)
+    if cached:
+        return dict(cached)
+    ram_b = 0
+    try:
+        ram_b = int(psutil.virtual_memory().total)
+    except Exception:
+        ram_b = 0
+    cores = os.cpu_count() or 1
+    name = ''
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as key:
+            name = str(winreg.QueryValueEx(key, 'ProcessorNameString')[0] or '').strip()
+    except Exception:
+        name = platform.processor() or ''
+    ram_gb = round(ram_b / (1024 ** 3), 1) if ram_b else 0
+    # 8 GB sticks report a little under 8. Four threads or fewer cannot spare Roblox and a blurred window.
+    lite = (ram_b > 0 and ram_b <= int(8.5 * 1024 ** 3)) or cores <= 4
+    cached = {'ram_gb': ram_gb, 'cores': int(cores), 'cpu': name[:80], 'lite': bool(lite)}
+    machine_profile._cached = cached
+    return dict(cached)
 
 
 def _kind(value):
@@ -377,9 +408,54 @@ def wait_for_front(grace=3.0, take=True):
 
 
 INPUT_LOCK = threading.RLock()     # so another thread's combo (the clip key) isn't cut into
+driving_until = 0.0                 # monotonic time until which input is the macro's, not the user's
+_seen_input = None
+
+
+class _LASTINPUT(ctypes.Structure):
+    _fields_ = [('cbSize', wintypes.UINT), ('dwTime', wintypes.DWORD)]
+
+
+u32.GetLastInputInfo.argtypes = [ctypes.POINTER(_LASTINPUT)]
+u32.GetLastInputInfo.restype = wintypes.BOOL
+
+
+def _input_tick():
+    info = _LASTINPUT(ctypes.sizeof(_LASTINPUT), 0)
+    if not u32.GetLastInputInfo(ctypes.byref(info)):
+        return 0
+    return int(info.dwTime)
+
+
+def note_own_input(hold=0.75):
+    """The next input events belong to the macro, so they must not look like the user took the PC."""
+    global driving_until
+    driving_until = max(driving_until, time.monotonic() + hold)
+
+
+def forget_user_input():
+    """Start of a run: whatever happened before Start is not the user taking over."""
+    global _seen_input, driving_until
+    _seen_input = _input_tick()
+    driving_until = time.monotonic() + 1.0
+
+
+def user_took_over():
+    """True once, when the mouse or keyboard moves and the macro did not just do it."""
+    global _seen_input
+    tick = _input_tick()
+    if time.monotonic() < driving_until:
+        _seen_input = tick
+        return False
+    if _seen_input is None or tick == _seen_input:
+        _seen_input = tick
+        return False
+    _seen_input = tick
+    return True
 
 
 def _send(vk, flags, sc=None):
+    note_own_input()
     if not flags & KEYUP:
         wait_for_front()
     sc = sc or u32.MapVirtualKeyExW(vk, 0, _layout()) or u32.MapVirtualKeyW(vk, 0)
@@ -412,6 +488,7 @@ MASK_VK = 0xE8              # tap a dead key before Win goes up so Start stays s
 
 
 def _key(vk, up):
+    note_own_input()
     u32.SendInput(1, ctypes.byref(IN(type=1, ki=KI(wVk=vk, wScan=0, dwFlags=KEYUP if up else 0,
                                                    time=0, dwExtraInfo=0))), ctypes.sizeof(IN))
 
@@ -473,6 +550,7 @@ def disarm():
 
 
 def tap(key, hold=None, gap=None):
+    note_own_input(0.5 + (0.03 if hold is None else hold) + (STEP_DELAY if gap is None else gap))
     wait_for_front()
     with INPUT_LOCK:
         kb.press(key)
@@ -490,6 +568,7 @@ _said_refused = False
 def _mouse(flags, data=0, dx=0, dy=0):
     """One mouse event. False if Windows refused it."""
     global _said_refused
+    note_own_input()
     inp = IN(type=0, mi=MI(dx=dx, dy=dy, mouseData=data & 0xFFFFFFFF, dwFlags=flags, time=0, dwExtraInfo=0))
     with INPUT_LOCK:
         sent = u32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
@@ -1030,7 +1109,7 @@ def close_inventory():
         if not inventory_open():
             return True
     print('   the Inventory would not close')
-    return True
+    return False
 
 
 # ================================================================ staying connected
@@ -1396,7 +1475,8 @@ def opened_tab(before, wait=TAB_WAIT_S):
     end = time.monotonic() + wait
     while time.monotonic() < end:
         front, wins = foreground_hwnd(), browser_windows()
-        if front in wins and 'roblox' in wins[front].lower():
+        title = wins.get(front) or ''
+        if front in wins and 'roblox' in title.lower() and before.get(front) != title:
             return front
         time.sleep(0.25)
     for hwnd, title in browser_windows().items():
@@ -1439,8 +1519,8 @@ def close_opened_tab(hwnd, say):
 def came_back(log_dir, stop, wait):
     """True once the game rejoined by itself."""
     end = time.monotonic() + wait
+    watch = Watch(log_dir)                  # one watcher: poll reads only new log bytes
     while time.monotonic() < end and not stop():
-        watch = Watch(log_dir)
         watch.poll()
         if watch.state == 'joined' and in_game(watch):
             return True

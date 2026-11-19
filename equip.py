@@ -243,12 +243,14 @@ def equip(aura, halt, say=print, logged=lambda since: False, other=lambda since:
             if how:
                 break
             time.sleep(0.2)
-        if how and nap(1.0, halt) and other(since):
-            say('Roblox\'s log says %s went on instead (a cell read wrong): trying the next one (go %d of %d)'
-                % (other(since), go, TRIES))
-            wrong.add(cell)
-            shut()
-            continue
+        if how and nap(1.0, halt):
+            other_aura = other(since)
+            if other_aura:
+                say('Roblox\'s log says %s went on instead (a cell read wrong): trying the next one (go %d of %d)'
+                    % (other_aura, go, TRIES))
+                wrong.add(cell)
+                shut()
+                continue
         now = shown() if how else None          # clicks land in order, so the panel now names what really went on
         if now is not None and norm(now) != norm(aura):
             say('%s went on instead (a cell click landed late): trying the next one (go %d of %d)' % (now, go, TRIES))

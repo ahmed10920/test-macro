@@ -229,7 +229,13 @@ def open_shop(halt, say=print):
 def read_shop(names, halt):
     """{slot: item} once the shop has faded in, with a second look at the rest."""
     end, k = time.perf_counter() + SHOP_WAIT_S * game.PACE, 0
-    while not slot_item(k % SLOTS + 1, names):                  # it comes up 1-3 s after Shop
+    while True:                                                # it comes up 1-3 s after Shop
+        try:
+            item = slot_item(k % SLOTS + 1, names)
+        except Exception:                                      # transient OCR/capture failure, try the next slot
+            item = None
+        if item:
+            break
         k += 1
         if time.perf_counter() > end or not nap(0.1, halt):
             break

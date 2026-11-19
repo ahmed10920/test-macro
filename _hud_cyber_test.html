@@ -1,0 +1,3451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MMacro · Cyber HUD</title>
+<link rel="stylesheet" href="/ui/vendor/driver.css" />
+<script src="/ui/vendor/driver.js.iife.js"></script>
+<style>
+  :root {
+    --bg: #04070e;
+    --bg-sidebar: rgba(7, 11, 22, 0.92);
+    --panel: rgba(12, 20, 36, 0.72);
+    --panel-solid: #0c1424;
+    --panel-alt: rgba(18, 30, 52, 0.78);
+    --sunk: rgba(5, 9, 17, 0.85);
+    --border: rgba(56, 189, 248, 0.16);
+    --border-bright: rgba(56, 189, 248, 0.45);
+    --text: #f1f5f9;
+    --subtext: #94a3b8;
+    --dim: #5c6c84;
+    --accent: #38bdf8;
+    --accent-2: #818cf8;
+    --good: #22d3ee;
+    --emerald: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --biome-rgb: 56, 189, 248;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* Ambient Cyber Nebula Backdrop */
+  .ambient-bg {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(circle at 22% 18%, rgba(var(--biome-rgb), 0.14), transparent 44%),
+      radial-gradient(circle at 82% 78%, rgba(129, 140, 248, 0.10), transparent 48%),
+      linear-gradient(180deg, #04070e 0%, #050a14 100%);
+    transition: background 0.6s ease;
+  }
+  .grid-overlay {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.25;
+    background-image: radial-gradient(rgba(56, 189, 248, 0.22) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .app-shell {
+    position: relative; z-index: 1;
+    display: flex; height: 100vh; width: 100vw;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 224px; flex-shrink: 0;
+    background: var(--bg-sidebar);
+    backdrop-filter: blur(18px);
+    border-right: 1px solid rgba(56, 189, 248, 0.12);
+    display: flex; flex-direction: column;
+    padding: 16px 12px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 11px;
+    padding: 6px 8px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+  }
+  .brand-crest {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(129, 140, 248, 0.18));
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);
+    display: grid; place-items: center;
+  }
+  .brand-title { font-weight: 700; font-size: 14px; letter-spacing: 0.06em; color: #f8fafc; }
+  .brand-sub { font-family: 'Consolas', monospace; font-size: 10px; color: var(--accent); letter-spacing: 0.05em; }
+
+  .nav-label {
+    font-family: 'Consolas', monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+    color: var(--dim); padding: 14px 10px 6px;
+  }
+  .nav-list { display: flex; flex-direction: column; gap: 4px; flex: 1; overflow-y: auto; }
+  .nav-item {
+    position: relative;
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 12px; border-radius: 11px;
+    color: var(--subtext); font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1px solid transparent;
+    transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .nav-item:hover {
+    background: rgba(56, 189, 248, 0.07);
+    color: #e2e8f0;
+    border-color: rgba(56, 189, 248, 0.14);
+  }
+  .nav-item.active {
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.18), rgba(56, 189, 248, 0.05));
+    color: #ffffff; font-weight: 600;
+    border-color: rgba(56, 189, 248, 0.38);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 16px rgba(56, 189, 248, 0.12);
+  }
+  .nav-item.active::before {
+    content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px;
+    border-radius: 0 4px 4px 0;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+  }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.78; transition: 0.18s; }
+  .nav-item.active svg { color: var(--accent); opacity: 1; filter: drop-shadow(0 0 6px rgba(56,189,248,0.65)); }
+  .nav-dot {
+    margin-left: auto; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--good); box-shadow: 0 0 8px var(--good);
+    display: none;
+  }
+  .nav-dot.on { display: block; }
+
+  .sidebar-footer {
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .power-btn {
+    width: 100%; padding: 11px 14px; border-radius: 12px;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(56, 189, 248, 0.08));
+    color: #7dd3fc; font-family: 'Consolas', monospace; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    cursor: pointer; transition: all 0.2s ease;
+  }
+  .power-btn:hover {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.32), rgba(14, 165, 233, 0.18));
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.25); transform: translateY(-1px);
+  }
+  .power-btn.running {
+    border-color: rgba(248, 113, 113, 0.55);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.24), rgba(220, 38, 38, 0.1));
+    color: #fca5a5;
+  }
+  .power-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+
+  /* Workspace */
+  .main {
+    flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 28px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .top-left { display: flex; flex-direction: column; gap: 4px; }
+  .title-line { display: flex; align-items: center; gap: 12px; }
+  .page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.28);
+    font-family: 'Consolas', monospace; font-size: 11px; font-weight: 700; color: #7dd3fc;
+  }
+  .status-pill.live {
+    background: rgba(34, 211, 238, 0.15); border-color: rgba(34, 211, 238, 0.5); color: #67e8f9;
+  }
+  .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+  .status-pill.live .pulse-dot {
+    background: var(--good); box-shadow: 0 0 10px var(--good);
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: 0.6; } }
+
+  .user-sub {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--subtext);
+  }
+  .user-sub span.mono { font-family: 'Consolas', monospace; color: var(--dim); font-size: 11px; }
+
+  .top-right { display: flex; align-items: center; gap: 10px; }
+  .tele-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 12px; border-radius: 10px;
+    background: var(--panel); border: 1px solid rgba(255, 255, 255, 0.08);
+    font-family: 'Consolas', monospace; font-size: 11px; font-weight: 700; color: var(--subtext);
+  }
+  .tele-pill.linked { border-color: rgba(34, 211, 238, 0.35); color: #e2e8f0; }
+  .tele-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+  .tele-pill.linked .tele-dot { background: var(--emerald); box-shadow: 0 0 8px var(--emerald); }
+
+  /* Scroll Content */
+  .scroll-area {
+    flex: 1; overflow-y: auto; padding: 18px 28px 28px;
+  }
+  .scroll-area::-webkit-scrollbar { width: 7px; }
+  .scroll-area::-webkit-scrollbar-track { background: transparent; }
+  .scroll-area::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.22); border-radius: 99px; }
+  .scroll-area::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.45); }
+
+  .page { display: none; animation: fadeSlide 0.2s ease; }
+  .page.active { display: block; }
+  @keyframes fadeSlide { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Dashboard 3-Column Cyber Grid */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 280px minmax(300px, 1.15fr) minmax(260px, 0.95fr);
+    gap: 20px; align-items: start;
+  }
+  .dash-console-card { display: none; margin-top: 20px; flex-direction: column; min-height: 180px; flex: 1; }
+  .dash-console-box {
+    flex: 1; padding: 12px 18px; overflow-y: auto;
+    font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.6;
+    background: rgba(3, 6, 12, 0.72);
+  }
+  @media (min-width: 1360px) {
+    .dash-grid {
+      grid-template-columns: minmax(310px, 0.9fr) minmax(380px, 1.3fr) minmax(330px, 1fr);
+      gap: 24px;
+    }
+    .hero-card { height: clamp(248px, 31vh, 330px); }
+    .instance-card { height: clamp(196px, 24vh, 250px); }
+    .chip { padding: 11px 10px; font-size: 11.5px; color: var(--subtext); }
+    .console-box { height: clamp(220px, 42vh, 460px); }
+  }
+  @media (min-height: 800px) {
+    #page-dashboard.active { display: flex; flex-direction: column; min-height: 100%; }
+    .dash-console-card { display: flex; }
+  }
+
+  .glass-card {
+    position: relative;
+    background: var(--panel);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(56, 189, 248, 0.16);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  .hud-corners::before, .hud-corners::after {
+    content: ""; position: absolute; width: 12px; height: 12px; pointer-events: none; z-index: 3;
+    border-color: rgba(var(--biome-rgb), 0.7); border-style: solid;
+  }
+  .hud-corners::before { top: 10px; left: 10px; border-width: 1.5px 0 0 1.5px; border-radius: 3px 0 0 0; }
+  .hud-corners::after { bottom: 10px; right: 10px; border-width: 0 1.5px 1.5px 0; border-radius: 0 0 3px 0; }
+
+  /* Hero Biome Card */
+  .hero-card {
+    height: 248px; padding: 22px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .hero-bg-img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    filter: blur(14px) brightness(0.42) saturate(1.4); transform: scale(1.15);
+    z-index: 0; transition: all 0.4s ease;
+  }
+  .hero-gradient {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(180deg, rgba(var(--biome-rgb), 0.18) 0%, rgba(5, 9, 17, 0.92) 100%);
+  }
+  .hero-content { position: relative; z-index: 2; display: flex; flex-direction: column; height: 100%; justify-content: space-between; }
+  .micro-tag {
+    font-family: 'Consolas', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+    color: #7dd3fc; text-transform: uppercase;
+  }
+  .biome-emblem-wrap {
+    width: 74px; height: 74px; border-radius: 18px;
+    padding: 2px;
+    background: linear-gradient(135deg, rgba(var(--biome-rgb), 0.9), rgba(255,255,255,0.2));
+    box-shadow: 0 0 24px rgba(var(--biome-rgb), 0.35);
+    margin-top: 6px;
+  }
+  .biome-emblem {
+    width: 100%; height: 100%; border-radius: 16px; object-fit: cover; background: #070d18; display: block;
+  }
+  .hero-biome-name { font-size: 27px; font-weight: 700; letter-spacing: -0.02em; color: #f8fafc; line-height: 1.1; }
+  .hero-rate {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'Consolas', monospace; font-size: 12px; font-weight: 700; color: var(--accent);
+    margin-top: 6px;
+  }
+
+  .stats-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .stat-box { padding: 14px 16px; }
+  .stat-label { font-family: 'Consolas', monospace; font-size: 10px; font-weight: 700; color: var(--dim); letter-spacing: 0.08em; }
+  .stat-val { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .stat-val.cyan { color: var(--accent); text-shadow: 0 0 16px rgba(56, 189, 248, 0.35); }
+
+  .btn-primary {
+    width: 100%; padding: 13px 16px; border-radius: 13px; border: none;
+    background: linear-gradient(135deg, #38bdf8, #0284c7);
+    color: #030914; font-size: 13px; font-weight: 700; letter-spacing: 0.03em;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 6px 24px rgba(56, 189, 248, 0.32);
+    transition: all 0.2s ease;
+  }
+  .btn-primary:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 8px 28px rgba(56, 189, 248, 0.45); }
+  .btn-primary.stop {
+    background: linear-gradient(135deg, #f87171, #dc2626);
+    color: #fff; box-shadow: 0 6px 24px rgba(248, 113, 113, 0.32);
+  }
+  .btn-secondary {
+    width: 100%; margin-top: 10px; padding: 11px 16px; border-radius: 13px;
+    background: rgba(15, 23, 38, 0.8); border: 1px solid rgba(56, 189, 248, 0.2);
+    color: var(--subtext); font-size: 12px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.18s ease;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--text); background: rgba(20, 34, 56, 0.9); }
+
+  .sec-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; font-family: 'Consolas', monospace; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.08em; color: var(--subtext);
+  }
+  .sec-hdr span.hl { color: var(--accent); }
+
+  /* Active Instance Card */
+  .instance-card { height: 196px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 16px; }
+  .inst-banner {
+    position: absolute; inset: 0 0 42% 0; object-fit: cover; width: 100%; height: 60%;
+    filter: blur(8px) brightness(0.65) saturate(1.4); z-index: 0;
+  }
+  .inst-fade {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(180deg, rgba(var(--biome-rgb), 0.22) 0%, rgba(10, 16, 28, 0.95) 62%);
+  }
+  .inst-top { position: relative; z-index: 2; display: flex; align-items: center; gap: 14px; }
+  .avatar-ring {
+    width: 52px; height: 52px; border-radius: 50%; overflow: hidden;
+    background: #0a1526; border: 2px solid var(--accent);
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.45);
+    display: grid; place-items: center; flex-shrink: 0;
+  }
+  .avatar-ring img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .inst-name { font-size: 15px; font-weight: 700; color: #fff; }
+  .inst-aura { font-size: 12px; color: #f472b6; font-weight: 600; margin-top: 2px; }
+  .inst-bottom { position: relative; z-index: 2; }
+  .inst-biome-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .biome-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 12px 4px 6px; border-radius: 999px;
+    background: rgba(4, 7, 14, 0.85); border: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 12px; font-weight: 600;
+  }
+  .biome-pill img { width: 18px; height: 18px; border-radius: 5px; object-fit: cover; }
+
+  /* Automation Matrix */
+  .matrix-card { padding: 12px; }
+  .matrix-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .chip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 9px 8px; border-radius: 10px;
+    background: rgba(5, 9, 17, 0.75); border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--dim); font-size: 11px; font-weight: 600; white-space: nowrap;
+    cursor: pointer; transition: all 0.18s ease;
+  }
+  .chip:hover { border-color: rgba(56, 189, 248, 0.38); color: var(--text); transform: translateY(-1px); }
+  .chip.on {
+    background: rgba(56, 189, 248, 0.14); border-color: rgba(56, 189, 248, 0.45);
+    color: #e0f2fe; box-shadow: 0 0 12px rgba(56, 189, 248, 0.14);
+  }
+  .chip-dot { width: 7px; height: 7px; border-radius: 50%; background: #334155; flex-shrink: 0; }
+  .chip.on .chip-dot { background: var(--good); box-shadow: 0 0 8px var(--good); }
+
+  /* History & Command Link */
+  .hist-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .hist-item {
+    display: flex; align-items: center; gap: 11px; padding: 10px 12px;
+    border-radius: 13px; background: var(--panel); border: 1px solid rgba(56, 189, 248, 0.15);
+  }
+  .hist-item img { width: 36px; height: 36px; border-radius: 9px; object-fit: cover; border: 1px solid rgba(255,255,255,0.16); }
+  .hist-meta { flex: 1; min-width: 0; }
+  .hist-top { display: flex; justify-content: space-between; align-items: center; }
+  .hist-biome { font-size: 13px; font-weight: 600; color: #7dd3fc; }
+  .hist-time { font-family: 'Consolas', monospace; font-size: 11px; color: var(--accent); }
+  .hist-user { font-size: 11.5px; color: var(--subtext); margin-top: 2px; }
+
+  .cmd-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .cmd-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+
+  /* Biome Counts Panel */
+  .counts-card { margin-top: 16px; padding: 18px 20px; }
+  .counts-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 10px; }
+  .counts-title { display: flex; align-items: center; gap: 9px; font-size: 15.5px; font-weight: 700; color: #f8fafc; }
+  .counts-badge {
+    font-family: 'Consolas', monospace; font-size: 11.5px; font-weight: 700;
+    padding: 5px 12px; border-radius: 9px;
+    background: rgba(16, 185, 129, 0.14); color: #34d399;
+    border: 1px solid rgba(52, 211, 153, 0.35);
+  }
+  .biome-counts-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 1080px) { .biome-counts-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 820px) { .biome-counts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .count-pill {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 14px; border-radius: 13px;
+    background: rgba(5, 9, 17, 0.84); border: 1px solid rgba(255, 255, 255, 0.08);
+    min-width: 0; transition: transform 0.16s ease, border-color 0.16s ease;
+  }
+  .count-pill:hover { transform: translateY(-1px); border-color: rgba(56, 189, 248, 0.38); }
+  .count-left { display: flex; align-items: center; gap: 11px; min-width: 0; flex: 1; }
+  .count-img { width: 44px; height: 44px; border-radius: 11px; object-fit: cover; flex-shrink: 0; background: #070d18; }
+  .count-meta { min-width: 0; flex: 1; }
+  .count-name { font-size: 13px; font-weight: 700; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .count-rate { font-family: 'Consolas', monospace; font-size: 10px; color: var(--subtext); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .count-val { font-family: 'Consolas', monospace; font-size: 17px; font-weight: 700; color: #60a5fa; flex-shrink: 0; padding-left: 4px; position: relative; z-index: 2; }
+  .count-val.zero { color: var(--dim); }
+
+  /* Biome Counts Rare Card FX */
+  .count-pill { position: relative; overflow: hidden; }
+  .count-left { position: relative; z-index: 2; }
+  .count-pill.rare-glitch-card {
+    border-color: rgba(59, 227, 122, 0.45) !important;
+    background: linear-gradient(135deg, rgba(6, 22, 14, 0.92), rgba(5, 11, 18, 0.92));
+    box-shadow: 0 0 18px rgba(59, 227, 122, 0.14), inset 0 0 14px rgba(59, 227, 122, 0.08);
+    animation: glitch-card-pulse 3.6s steps(1, end) infinite;
+  }
+  .count-pill.rare-glitch-card::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    background: repeating-linear-gradient(0deg, rgba(59, 227, 122, 0.07) 0px, rgba(59, 227, 122, 0.07) 1px, transparent 1px, transparent 4px);
+    animation: glitch-scan 4s linear infinite;
+  }
+  .glitch-noise-stream {
+    position: absolute; inset: 4px 34px 4px 58px; pointer-events: none; z-index: 1;
+    display: flex; align-items: flex-start; justify-content: flex-end;
+    font-family: 'Consolas', monospace; font-size: 9.5px; line-height: 1.2; letter-spacing: 1.5px;
+    color: rgba(59, 227, 122, 0.36); text-align: right; overflow: hidden; user-select: none;
+    text-shadow: 1px 0 rgba(239, 68, 68, 0.5), -1px 0 rgba(56, 189, 248, 0.5);
+  }
+  .glitch-title-fx {
+    display: inline-block;
+    text-shadow: 1.5px 0 rgba(59, 227, 122, 0.75), -1.5px 0 rgba(236, 72, 153, 0.65);
+    animation: glitch-text-skew 2.8s infinite;
+  }
+  @keyframes glitch-scan {
+    0% { transform: translateY(-4px); } 100% { transform: translateY(4px); }
+  }
+  @keyframes glitch-card-pulse {
+    0%, 92%, 100% { transform: translate(0, 0); filter: none; }
+    93% { transform: translate(-1.5px, 0.5px); filter: hue-rotate(15deg) brightness(1.15); }
+    95% { transform: translate(1.5px, -0.5px); }
+    97% { transform: translate(-1px, 0); }
+  }
+  @keyframes glitch-text-skew {
+    0%, 88%, 100% { transform: skewX(0deg); color: #f1f5f9; }
+    90% { transform: skewX(-10deg); color: #4ade80; }
+    92% { transform: skewX(8deg); color: #f472b6; }
+    94% { transform: skewX(0deg); color: #38bdf8; }
+  }
+
+  .count-pill.rare-cyber-card {
+    border-color: rgba(56, 189, 248, 0.55) !important;
+    background: linear-gradient(135deg, rgba(6, 20, 42, 0.94), rgba(5, 11, 24, 0.94));
+    box-shadow: 0 0 20px rgba(47, 211, 255, 0.18), inset 0 0 16px rgba(56, 189, 248, 0.10);
+  }
+  .cyber-bin-stream {
+    position: absolute; left: 54px; right: 26px; top: 50%; transform: translateY(-50%);
+    pointer-events: none; z-index: 1; white-space: nowrap; overflow: hidden;
+    font-family: 'Consolas', monospace; font-size: 10px; font-weight: 700; letter-spacing: 2px;
+    color: rgba(56, 189, 248, 0.24); text-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
+    user-select: none;
+  }
+  .cyber-bin-stream span {
+    display: inline-block; padding-left: 100%;
+    animation: cyber-binary-scroll 6s linear infinite;
+  }
+  @keyframes cyber-binary-scroll {
+    0% { transform: translateX(0); } 100% { transform: translateX(-100%); }
+  }
+  .cyber-status-row {
+    display: inline-flex; align-items: center; gap: 5px; margin-top: 3px; max-width: 100%;
+  }
+  .cyber-lock-icon {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 15px; height: 15px; border-radius: 4px;
+    background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.55);
+    color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+  }
+  .cyber-lock-svg { width: 9px; height: 9px; overflow: visible; }
+  .cyber-lock-shackle {
+    transform-origin: 16px 11px;
+    animation: cyber-shackle-cycle 2.8s ease-in-out infinite;
+  }
+  @keyframes cyber-shackle-cycle {
+    0%, 35% { transform: translateY(0px) rotate(0deg); }
+    50%, 82% { transform: translateY(-2.4px) rotate(14deg); }
+    100% { transform: translateY(0px) rotate(0deg); }
+  }
+  .cyber-bin-tag {
+    font-family: 'Consolas', monospace; font-size: 9.5px; font-weight: 700;
+    color: #38bdf8; letter-spacing: 0.06em;
+    text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+  }
+
+  .count-pill.rare-dream-card {
+    border-color: rgba(232, 106, 240, 0.48) !important;
+    background: linear-gradient(135deg, rgba(28, 10, 38, 0.92), rgba(10, 12, 26, 0.94));
+    box-shadow: 0 0 18px rgba(232, 106, 240, 0.16), inset 0 0 16px rgba(232, 106, 240, 0.08);
+    animation: dream-card-glow 4s ease-in-out infinite;
+  }
+  @keyframes dream-card-glow {
+    0%, 100% { box-shadow: 0 0 14px rgba(232, 106, 240, 0.16); }
+    50% { box-shadow: 0 0 24px rgba(232, 106, 240, 0.34); }
+  }
+
+  /* Rare Biome Active Hero & Spawn FX */
+  .hero-fx-layer {
+    position: absolute; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  body.rare-glitched #heroCard {
+    border-color: rgba(59, 227, 122, 0.72);
+    box-shadow: 0 0 30px rgba(59, 227, 122, 0.3), inset 0 0 20px rgba(59, 227, 122, 0.14);
+    animation: glitch-card-pulse 2.2s steps(1, end) infinite;
+  }
+  body.rare-glitched #heroCard .hero-fx-layer {
+    opacity: 1;
+    background: repeating-linear-gradient(0deg, rgba(59, 227, 122, 0.09) 0px, rgba(59, 227, 122, 0.09) 2px, transparent 2px, transparent 6px);
+  }
+  body.rare-glitched #heroBiomeName {
+    color: #4ade80;
+    text-shadow: 2px 0 rgba(239, 68, 68, 0.8), -2px 0 rgba(56, 189, 248, 0.8);
+    animation: glitch-text-skew 1.8s infinite;
+  }
+
+  body.rare-dreamspace #heroCard {
+    border-color: rgba(255, 122, 247, 0.92);
+    box-shadow: 0 0 42px rgba(255, 72, 240, 0.52), inset 0 0 28px rgba(255, 255, 255, 0.14);
+    animation: dream-card-glow 3s ease-in-out infinite;
+  }
+  body.rare-dreamspace #heroCard .hero-fx-layer {
+    opacity: 0;
+  }
+  body.rare-dreamspace #heroBiomeName {
+    color: #fff;
+    text-shadow: 0 0 10px #fff, 0 0 24px #ff64f0, 0 0 48px #ff3ee8;
+  }
+
+  body.rare-cyberspace #heroCard {
+    border-color: rgba(47, 211, 255, 0.8);
+    box-shadow: 0 0 34px rgba(47, 211, 255, 0.36), inset 0 0 22px rgba(56, 189, 248, 0.16);
+  }
+  body.rare-cyberspace #heroCard .hero-fx-layer {
+    opacity: 1;
+    background:
+      linear-gradient(180deg, transparent 0%, rgba(56, 189, 248, 0.22) 50%, transparent 100%);
+    background-size: 100% 45%;
+    animation: cyber-laser-scan 2.4s linear infinite;
+  }
+  body.rare-cyberspace #heroBiomeName {
+    color: #7dd3fc;
+    text-shadow: 0 0 18px rgba(47, 211, 255, 0.9);
+  }
+  @keyframes cyber-laser-scan {
+    0% { background-position: 0 -60%; } 100% { background-position: 0 160%; }
+  }
+
+  /* Full-App Rare Biome Takeover Effects (Glitched / Dreamspace / Cyberspace) */
+  #appRareFx {
+    position: fixed; inset: 0; pointer-events: none; z-index: 80; overflow: hidden; opacity: 0;
+    transition: opacity 0.45s ease;
+  }
+  body.rare-glitched #appRareFx,
+  body.rare-dreamspace #appRareFx,
+  body.rare-cyberspace #appRareFx { opacity: 1; }
+
+  /* Full-App GLITCHED */
+  body.rare-glitched {
+    --accent: #4ade80;
+    --accent-2: #ef4444;
+    --good: #4ade80;
+    --emerald: #4ade80;
+    --border: rgba(59, 227, 122, 0.34);
+    --border-bright: rgba(74, 222, 128, 0.65);
+  }
+  body.rare-glitched .ambient-bg {
+    background:
+      radial-gradient(circle at 16% 18%, rgba(34, 197, 94, 0.28), transparent 50%),
+      radial-gradient(circle at 84% 78%, rgba(239, 68, 68, 0.22), transparent 52%),
+      radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.16), transparent 62%),
+      linear-gradient(180deg, #030a06 0%, #050a08 100%);
+  }
+  body.rare-glitched .grid-overlay {
+    opacity: 0.42;
+    background-image:
+      linear-gradient(rgba(74, 222, 128, 0.14) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(239, 68, 68, 0.10) 1px, transparent 1px);
+  }
+  body.rare-glitched .app-shell {
+    animation: glitch-app-twitch 3.6s steps(1, end) infinite;
+  }
+  @keyframes glitch-app-twitch {
+    0%, 91%, 100% { transform: translate(0, 0); filter: none; }
+    92% { transform: translate(-2px, 0); filter: hue-rotate(-10deg) contrast(1.06); }
+    94% { transform: translate(3px, 0); filter: hue-rotate(12deg) contrast(1.08); }
+    96% { transform: translate(-1px, 1px); filter: none; }
+  }
+  body.rare-glitched .sidebar,
+  body.rare-glitched .topbar,
+  body.rare-glitched .card,
+  body.rare-glitched .glass-card,
+  body.rare-glitched .hist-item {
+    border-color: rgba(74, 222, 128, 0.44);
+    box-shadow:
+      -2px 0 0 rgba(239, 68, 68, 0.24),
+      2px 0 0 rgba(56, 189, 248, 0.22),
+      0 0 24px rgba(34, 197, 94, 0.14),
+      inset 0 0 18px rgba(34, 197, 94, 0.06);
+  }
+  body.rare-glitched .nav-item.active {
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.24), rgba(239, 68, 68, 0.08));
+    border-color: rgba(74, 222, 128, 0.55);
+    box-shadow: -2px 0 10px rgba(239, 68, 68, 0.28), 2px 0 10px rgba(34, 197, 94, 0.32);
+  }
+  body.rare-glitched .nav-item:hover {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(74, 222, 128, 0.35);
+  }
+  body.rare-glitched .brand-crest,
+  body.rare-glitched .power-btn:not(.running) {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.28), rgba(239, 68, 68, 0.14));
+    border-color: rgba(74, 222, 128, 0.58);
+    color: #86efac;
+    box-shadow: 0 0 18px rgba(34, 197, 94, 0.28);
+  }
+  body.rare-glitched .btn-primary:not(.stop) {
+    background: linear-gradient(135deg, #4ade80, #16a34a);
+    color: #021208;
+    box-shadow: -2px 0 0 rgba(239, 68, 68, 0.45), 2px 0 0 rgba(56, 189, 248, 0.45), 0 6px 26px rgba(34, 197, 94, 0.42);
+  }
+  body.rare-glitched .btn-secondary,
+  body.rare-glitched .btn-sm {
+    border-color: rgba(74, 222, 128, 0.34);
+  }
+  body.rare-glitched .btn-sm:hover {
+    border-color: #4ade80; color: #86efac; background: rgba(34, 197, 94, 0.14);
+  }
+  body.rare-glitched .chip.on {
+    background: rgba(34, 197, 94, 0.16);
+    border-color: rgba(74, 222, 128, 0.58);
+    color: #dcfce7;
+    box-shadow: -1.5px 0 0 rgba(239, 68, 68, 0.32), 0 0 14px rgba(34, 197, 94, 0.22);
+  }
+  body.rare-glitched .switch.on {
+    background: rgba(34, 197, 94, 0.34);
+    border-color: #4ade80;
+    box-shadow: 0 0 14px rgba(74, 222, 128, 0.35);
+  }
+  body.rare-glitched .switch.on::after {
+    background: #86efac;
+    box-shadow: 0 0 10px #4ade80;
+  }
+  body.rare-glitched .status-pill,
+  body.rare-glitched .badge,
+  body.rare-glitched .micro-tag,
+  body.rare-glitched .hist-biome {
+    color: #86efac;
+    border-color: rgba(74, 222, 128, 0.42);
+    background: rgba(34, 197, 94, 0.12);
+  }
+  body.rare-glitched .hist-biome,
+  body.rare-glitched .micro-tag { background: transparent; border: none; }
+  body.rare-glitched .tele-pill.linked { border-color: rgba(74, 222, 128, 0.45); }
+  body.rare-glitched .avatar-ring {
+    border-color: #4ade80;
+    box-shadow: -2px 0 10px rgba(239, 68, 68, 0.45), 2px 0 14px rgba(74, 222, 128, 0.55);
+  }
+  body.rare-glitched .stat-val.cyan,
+  body.rare-glitched .count-val:not(.zero) {
+    color: #4ade80;
+    text-shadow: 1.5px 0 rgba(239, 68, 68, 0.7), -1.5px 0 rgba(56, 189, 248, 0.7);
+  }
+  body.rare-glitched .page-title,
+  body.rare-glitched .brand-title,
+  body.rare-glitched .card-title {
+    color: #bbf7d0;
+    text-shadow: 2px 0 rgba(239, 68, 68, 0.78), -2px 0 rgba(56, 189, 248, 0.78);
+    animation: glitch-text-skew 2.1s infinite;
+  }
+  body.rare-glitched #appRareFx::before {
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, rgba(74, 222, 128, 0.065) 0px, rgba(74, 222, 128, 0.065) 1px, transparent 1px, transparent 3px);
+  }
+  body.rare-glitched #appRareFx::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 110px;
+    background: linear-gradient(180deg, transparent, rgba(74, 222, 128, 0.18), rgba(239, 68, 68, 0.12), transparent);
+    animation: glitch-app-sweep 2.4s linear infinite;
+  }
+  .glitch-tear-bar {
+    position: absolute; left: 0; right: 0; height: 5px; opacity: 0.75;
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.65), rgba(74, 222, 128, 0.85), rgba(56, 189, 248, 0.65));
+    box-shadow: 0 0 14px rgba(74, 222, 128, 0.75);
+    mix-blend-mode: screen;
+  }
+  @keyframes glitch-app-sweep {
+    0% { transform: translateY(-100px); }
+    100% { transform: translateY(105vh); }
+  }
+
+  /* Full-App CYBERSPACE */
+  body.rare-cyberspace {
+    --accent: #2fd3ff;
+    --border: rgba(47, 211, 255, 0.32);
+  }
+  body.rare-cyberspace .ambient-bg {
+    background:
+      radial-gradient(circle at 20% 15%, rgba(47, 211, 255, 0.26), transparent 55%),
+      radial-gradient(circle at 85% 85%, rgba(37, 99, 235, 0.24), transparent 55%);
+  }
+  body.rare-cyberspace .grid-overlay {
+    background-image:
+      linear-gradient(rgba(47, 211, 255, 0.11) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(47, 211, 255, 0.11) 1px, transparent 1px);
+    animation: cyber-grid-pulse 3.2s ease-in-out infinite;
+  }
+  @keyframes cyber-grid-pulse {
+    0%, 100% { opacity: 0.65; } 50% { opacity: 1; }
+  }
+  body.rare-cyberspace .sidebar,
+  body.rare-cyberspace .topbar,
+  body.rare-cyberspace .card,
+  body.rare-cyberspace .glass-card {
+    border-color: rgba(47, 211, 255, 0.48);
+    box-shadow: 0 0 24px rgba(47, 211, 255, 0.15), inset 0 0 18px rgba(47, 211, 255, 0.06);
+  }
+  body.rare-cyberspace .page-title,
+  body.rare-cyberspace .brand-title {
+    color: #bae6fd;
+    text-shadow: 0 0 18px rgba(47, 211, 255, 0.85);
+  }
+  body.rare-cyberspace #appRareFx { z-index: 0; }
+  .cyber-layer {
+    position: absolute; inset: 0; overflow: hidden;
+    background: linear-gradient(180deg, #010614 0%, #03102b 42%, #07224a 58%, #020b1e 100%);
+  }
+  .cyber-haze {
+    position: absolute; left: -12%; right: -12%; top: 38%; height: 34%;
+    background: radial-gradient(ellipse at 50% 55%, rgba(96, 190, 255, 0.34), rgba(37, 99, 235, 0.2) 44%, transparent 72%);
+    filter: blur(34px);
+    animation: cyber-haze-breathe 6s ease-in-out infinite;
+  }
+  @keyframes cyber-haze-breathe {
+    0%, 100% { opacity: 0.7; transform: scaleY(0.94); }
+    50% { opacity: 1; transform: scaleY(1.08); }
+  }
+  .cyber-dome {
+    position: absolute; inset: -4% -2% 0;
+    filter: drop-shadow(0 0 5px rgba(186, 230, 253, 0.95)) drop-shadow(0 0 16px rgba(56, 189, 248, 0.85)) drop-shadow(0 0 44px rgba(37, 99, 235, 0.65));
+    opacity: 0.78;
+    animation: cyber-dome-pulse 5.5s ease-in-out infinite;
+  }
+  .cyber-dome svg { width: 100%; height: 100%; }
+  .cyber-dome line { stroke: #bfe6ff; stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .cyber-dome line.hz { stroke-width: 3; stroke: #e0f4ff; }
+  @keyframes cyber-dome-pulse {
+    0%, 100% { opacity: 0.66; }
+    50% { opacity: 1; }
+  }
+  .cyber-star {
+    position: absolute; width: 3px; height: 3px; border-radius: 50%;
+    background: #cfeaff; box-shadow: 0 0 8px #7dd3fc, 0 0 18px #38bdf8;
+    animation: cyber-twinkle 4s ease-in-out infinite;
+  }
+  @keyframes cyber-twinkle {
+    0%, 100% { opacity: 0.18; transform: scale(0.7); }
+    50% { opacity: 1; transform: scale(1.2); }
+  }
+  .cyber-streak {
+    position: absolute; height: 2px; border-radius: 999px;
+    background: linear-gradient(90deg, transparent 0%, rgba(224, 244, 255, 0.95) 16%, #fff 50%, rgba(224, 244, 255, 0.95) 84%, transparent 100%);
+    box-shadow: 0 0 6px rgba(224, 244, 255, 0.9), 0 0 20px rgba(56, 189, 248, 0.9), 0 0 48px rgba(37, 99, 235, 0.7);
+    mix-blend-mode: screen; opacity: 0;
+    animation: cyber-streak-sweep 7.5s ease-in-out infinite;
+  }
+  .cyber-streak-a { left: 4%; top: 24%; width: 44%; transform: rotate(-4deg); }
+  .cyber-streak-b { right: 2%; top: 40%; width: 48%; transform: rotate(3deg); animation-delay: 2.1s; animation-duration: 9.2s; }
+  .cyber-streak-c { left: 14%; top: 56%; width: 52%; transform: rotate(-2deg); animation-delay: 3.8s; animation-duration: 10.6s; }
+  @keyframes cyber-streak-sweep {
+    0%, 60%, 100% { opacity: 0; }
+    64% { opacity: 0.92; }
+    72% { opacity: 0.5; }
+    80% { opacity: 0.85; }
+    90% { opacity: 0; }
+  }
+  .cyber-float {
+    position: absolute; opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(191, 230, 255, 0.9)) drop-shadow(0 0 22px rgba(56, 189, 248, 0.8)) drop-shadow(0 0 54px rgba(37, 99, 235, 0.6));
+    will-change: transform;
+  }
+  .cyber-float svg { display: block; width: 100%; height: 100%; }
+  .cyber-blocks-a { left: 24%; top: 39%; width: 150px; height: 130px; animation: cyber-bob-a 15s ease-in-out infinite; }
+  .cyber-blocks-b { left: 44%; top: 47%; width: 110px; height: 96px; animation: cyber-bob-b 19s ease-in-out infinite; }
+  .cyber-blocks-c { left: 72%; top: 38%; width: 170px; height: 146px; animation: cyber-bob-c 17s ease-in-out infinite; }
+  @keyframes cyber-bob-a {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(-3deg); }
+    50% { transform: translate3d(18px, -16px, 0) rotate(3deg); }
+  }
+  @keyframes cyber-bob-b {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(2deg); }
+    50% { transform: translate3d(-14px, 14px, 0) rotate(-4deg); }
+  }
+  @keyframes cyber-bob-c {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(4deg); }
+    50% { transform: translate3d(16px, -20px, 0) rotate(-3deg); }
+  }
+  .cyber-vignette {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 52%, transparent 40%, rgba(2, 10, 30, 0.35) 74%, rgba(0, 4, 14, 0.72) 100%);
+  }
+
+  /* Full-App DREAMSPACE */
+  body.rare-dreamspace {
+    --accent: #e86af0;
+    --border: rgba(232, 106, 240, 0.34);
+  }
+  body.rare-dreamspace .ambient-bg {
+    background:
+      radial-gradient(ellipse at 50% 62%, rgba(255, 255, 255, 0.52) 0%, rgba(255, 158, 250, 0.5) 18%, rgba(226, 20, 208, 0.44) 42%, transparent 70%),
+      radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(92, 4, 86, 0.55) 100%),
+      linear-gradient(180deg, #8a0a80 0%, #d61cb8 36%, #ff5bf3 58%, #c214ad 78%, #6d0663 100%);
+    animation: dream-sky-breathe 7s ease-in-out infinite alternate;
+  }
+  @keyframes dream-sky-breathe {
+    0% { filter: brightness(0.92) saturate(1.05); }
+    100% { filter: brightness(1.14) saturate(1.22); }
+  }
+  body.rare-dreamspace .grid-overlay {
+    opacity: 0.2;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px);
+  }
+  body.rare-dreamspace .sidebar,
+  body.rare-dreamspace .topbar,
+  body.rare-dreamspace .card,
+  body.rare-dreamspace .glass-card {
+    border-color: rgba(255, 122, 247, 0.55);
+    box-shadow: 0 0 30px rgba(255, 72, 240, 0.28), inset 0 0 22px rgba(255, 186, 252, 0.1);
+  }
+  body.rare-dreamspace .sidebar,
+  body.rare-dreamspace .topbar {
+    background: linear-gradient(180deg, rgba(76, 6, 70, 0.84), rgba(38, 4, 37, 0.9));
+  }
+  body.rare-dreamspace .card,
+  body.rare-dreamspace .glass-card {
+    background: rgba(44, 5, 42, 0.76);
+  }
+  body.rare-dreamspace .btn-primary:not(.stop) {
+    background: linear-gradient(135deg, #f472b6, #a855f7);
+    color: #16041c;
+    box-shadow: 0 6px 26px rgba(232, 106, 240, 0.42);
+  }
+  body.rare-dreamspace .nav-item.active,
+  body.rare-dreamspace .chip.on {
+    background: rgba(232, 106, 240, 0.16);
+    border-color: rgba(232, 106, 240, 0.55);
+  }
+  body.rare-dreamspace .switch.on {
+    background: rgba(232, 106, 240, 0.35);
+    border-color: #e86af0;
+  }
+  body.rare-dreamspace .switch.on::after {
+    background: #f5d0fe;
+    box-shadow: 0 0 10px #e86af0;
+  }
+  body.rare-dreamspace .page-title,
+  body.rare-dreamspace .brand-title {
+    color: #fff;
+    text-shadow: 0 0 10px #fff, 0 0 24px rgba(255, 94, 243, 0.95), 0 0 52px rgba(255, 47, 224, 0.6);
+  }
+  body.rare-dreamspace .card-title,
+  body.rare-dreamspace .sec-hdr { color: #ffd6fb; }
+  body.rare-dreamspace .count-name,
+  body.rare-dreamspace .stat-val,
+  body.rare-dreamspace .hist-biome { color: #ffe4fd; }
+  body.rare-dreamspace .count-rate,
+  body.rare-dreamspace .hist-time { color: #ffb8f6; }
+
+  /* Dream sky layer: hot magenta world, blown-out white furniture, light rays */
+  body.rare-dreamspace #appRareFx { z-index: 0; }
+  .dream-layer { position: absolute; inset: 0; overflow: hidden; }
+  .dream-tint {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 60%, rgba(255, 255, 255, 0.2) 0%, rgba(255, 138, 249, 0.3) 26%, rgba(238, 28, 216, 0.4) 54%, rgba(120, 2, 112, 0.66) 100%),
+      linear-gradient(180deg, rgba(255, 60, 234, 0.36) 0%, rgba(255, 108, 245, 0.14) 46%, rgba(150, 2, 138, 0.54) 100%);
+    mix-blend-mode: screen;
+    animation: dream-tint-pulse 6.5s ease-in-out infinite;
+  }
+  @keyframes dream-tint-pulse {
+    0%, 100% { opacity: 0.78; }
+    50% { opacity: 1; }
+  }
+  .dream-cloud {
+    position: absolute; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.42) 0%, rgba(255, 198, 253, 0.32) 32%, rgba(255, 96, 238, 0.22) 58%, transparent 76%);
+    filter: blur(30px); mix-blend-mode: screen;
+    animation: dream-cloud-drift 28s ease-in-out infinite;
+  }
+  .dream-cloud-a { left: -10%; top: 2%; width: 58%; height: 36%; }
+  .dream-cloud-b { right: -12%; top: 10%; width: 60%; height: 32%; opacity: 0.82; animation-duration: 36s; animation-direction: reverse; }
+  .dream-cloud-c { left: 20%; bottom: -6%; width: 54%; height: 30%; opacity: 0.6; animation-duration: 42s; }
+  @keyframes dream-cloud-drift {
+    0%, 100% { transform: translate3d(-3%, 0, 0) scale(1); }
+    50% { transform: translate3d(4%, -2%, 0) scale(1.08); }
+  }
+  .dream-horizon {
+    position: absolute; left: -10%; right: -10%; top: 56%; height: 18%;
+    background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.44), rgba(255, 140, 248, 0.32) 38%, transparent 74%);
+    filter: blur(44px);
+    opacity: 0.55;
+    animation: dream-horizon-breathe 5.5s ease-in-out infinite;
+  }
+  @keyframes dream-horizon-breathe {
+    0%, 100% { opacity: 0.68; transform: scaleY(0.9); }
+    50% { opacity: 1; transform: scaleY(1.14); }
+  }
+  .dream-fog {
+    position: absolute; left: -22%; right: -22%; height: 220px;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(255, 255, 255, 0.3), transparent 62%),
+      radial-gradient(ellipse at 70% 50%, rgba(255, 200, 253, 0.28), transparent 62%);
+    filter: blur(36px);
+    mix-blend-mode: screen;
+  }
+  .dream-fog-a { top: 34%; animation: dream-fog-drift 17s ease-in-out infinite; }
+  .dream-fog-b { top: 60%; opacity: 0.7; animation: dream-fog-drift 24s ease-in-out infinite reverse; }
+  @keyframes dream-fog-drift {
+    0%, 100% { transform: translateX(-7%); }
+    50% { transform: translateX(7%); }
+  }
+  .dream-ray {
+    position: absolute; height: 2px; border-radius: 999px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.9) 16%, #fff 50%, rgba(255, 255, 255, 0.9) 84%, transparent 100%);
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.9), 0 0 20px rgba(255, 108, 240, 0.85), 0 0 48px rgba(255, 34, 216, 0.6);
+    mix-blend-mode: screen; opacity: 0;
+    animation: dream-ray-sweep 7s ease-in-out infinite;
+  }
+  .dream-ray-a { left: 4%; top: 26%; width: 42%; transform: rotate(-6deg); }
+  .dream-ray-b { right: 2%; top: 38%; width: 46%; transform: rotate(4deg); animation-delay: 1.4s; animation-duration: 8.6s; }
+  .dream-ray-c { left: 12%; top: 58%; width: 52%; transform: rotate(-3deg); animation-delay: 2.6s; animation-duration: 9.8s; }
+  .dream-ray-d { right: 6%; top: 70%; width: 38%; transform: rotate(7deg); animation-delay: 3.4s; animation-duration: 11s; }
+  .dream-vignette {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 55%, transparent 42%, rgba(110, 0, 98, 0.3) 74%, rgba(58, 0, 52, 0.66) 100%);
+  }
+  @keyframes dream-ray-sweep {
+    0%, 62%, 100% { opacity: 0; }
+    66% { opacity: 0.9; }
+    74% { opacity: 0.55; }
+    82% { opacity: 0.85; }
+    90% { opacity: 0; }
+  }
+  .dream-float {
+    position: absolute; color: #fff; opacity: 1;
+    will-change: transform, filter;
+    animation: dream-float-bob 14s ease-in-out infinite;
+  }
+  .dream-float svg {
+    display: block; width: 100%; height: 100%; position: relative; z-index: 2; fill: #fff;
+    filter:
+      drop-shadow(0 0 4px #fff)
+      drop-shadow(0 0 12px #fff)
+      drop-shadow(0 0 30px rgba(255, 140, 248, 0.98))
+      drop-shadow(0 0 64px rgba(255, 44, 224, 0.9))
+      drop-shadow(0 0 120px rgba(255, 20, 200, 0.72));
+  }
+  .dream-float .df-glow {
+    position: absolute; inset: -22%; z-index: 1; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.5) 26%, rgba(255, 126, 246, 0.42) 50%, transparent 74%);
+    filter: blur(22px); mix-blend-mode: screen;
+    animation: dream-glow-breathe 6s ease-in-out infinite;
+  }
+  @keyframes dream-glow-breathe {
+    0%, 100% { opacity: 0.75; transform: scale(0.96); }
+    50% { opacity: 1; transform: scale(1.06); }
+  }
+  .dream-lamp { left: 37%; top: 31%; width: 72px; height: 225px; animation: dream-float-lamp 17s ease-in-out infinite; }
+  .dream-table { left: 40%; top: 41%; width: 235px; height: 152px; animation: dream-float-table 21s ease-in-out infinite; }
+  .dream-chair { left: 53%; top: 38%; width: 165px; height: 190px; animation: dream-float-chair 19s ease-in-out infinite; }
+  .dream-door { right: 4%; top: 12%; width: 205px; height: 330px; animation: dream-float-door 25s ease-in-out infinite; }
+  .dream-bed { left: 64%; top: 35%; width: 285px; height: 195px; animation: dream-float-bed 23s ease-in-out infinite; }
+  @keyframes dream-float-bob {
+    0%, 100% { transform: translate3d(0, 0, 0); }
+    50% { transform: translate3d(0, -14px, 0); }
+  }
+  @keyframes dream-float-lamp {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(-2deg); }
+    50% { transform: translate3d(8px, -18px, 0) rotate(2deg); }
+  }
+  @keyframes dream-float-table {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(5deg) scale(1); }
+    50% { transform: translate3d(24px, -20px, 0) rotate(-3deg) scale(1.05); }
+  }
+  @keyframes dream-float-chair {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(36deg); }
+    33% { transform: translate3d(34px, -28px, 0) rotate(48deg); }
+    66% { transform: translate3d(-18px, 16px, 0) rotate(26deg); }
+  }
+  @keyframes dream-float-door {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(-24deg); }
+    50% { transform: translate3d(-22px, 24px, 0) rotate(-14deg); }
+  }
+  @keyframes dream-float-bed {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(-12deg); }
+    40% { transform: translate3d(-30px, -22px, 0) rotate(-4deg) scale(1.04); }
+    75% { transform: translate3d(14px, 20px, 0) rotate(-18deg); }
+  }
+  .rare-particle {
+    position: absolute; font-family: 'Consolas', monospace; font-weight: 700;
+    user-select: none; will-change: transform, opacity;
+    animation: rare-float linear infinite;
+  }
+  @keyframes rare-float {
+    0% { transform: translateY(-20px); opacity: 0; }
+    15% { opacity: 0.75; }
+    85% { opacity: 0.55; }
+    100% { transform: translateY(102vh); opacity: 0; }
+  }
+
+  /* Rare Biome Spawn Alert Banner */
+  #rareSpawnBanner {
+    position: fixed; top: 22px; left: 50%; transform: translate(-50%, -18px); z-index: 120;
+    padding: 12px 24px; border-radius: 14px; pointer-events: none; opacity: 0;
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(6, 12, 24, 0.96); backdrop-filter: blur(14px);
+    border: 1.5px solid var(--accent);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.68);
+    font-family: 'Consolas', monospace; font-size: 13px; font-weight: 700; letter-spacing: 0.05em;
+    transition: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  #rareSpawnBanner.show { opacity: 1; transform: translate(-50%, 0); }
+  #rareSpawnBanner.fx-glitched { border-color: #3be37a; color: #4ade80; box-shadow: 0 0 30px rgba(59, 227, 122, 0.42); }
+  #rareSpawnBanner.fx-dreamspace { border-color: #ff5bf3; color: #ffe4fd; box-shadow: 0 0 30px rgba(255, 72, 240, 0.55); }
+  #rareSpawnBanner.fx-cyberspace { border-color: #2fd3ff; color: #7dd3fc; box-shadow: 0 0 30px rgba(47, 211, 255, 0.48); }
+
+  /* GLITCHED SERVER INFO messages inside the Live Activity Feed */
+  .glitch-msg-stack {
+    position: absolute; left: 16px; right: 16px; top: 56px; bottom: 16px;
+    display: flex; flex-direction: column; gap: 10px; justify-content: center;
+    pointer-events: none; opacity: 0; visibility: hidden;
+    transition: opacity 0.22s ease;
+    z-index: 5;
+  }
+  .glitch-msg-stack.show { opacity: 1; visibility: visible; }
+  .glitch-msg {
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; gap: 13px;
+    padding: 10px 16px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(70, 4, 4, 0.5), transparent 72%), rgba(7, 0, 0, 0.96);
+    border: 1.5px solid rgba(255, 40, 40, 0.92);
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px rgba(60, 0, 0, 0.9), 0 0 26px rgba(255, 24, 24, 0.4), inset 0 0 24px rgba(255, 16, 16, 0.16);
+    font-family: 'Consolas', monospace;
+  }
+  .glitch-msg .gm-icon {
+    flex-shrink: 0; width: 34px; height: 34px; color: #ff2727;
+    filter: drop-shadow(0 0 8px rgba(255, 36, 36, 0.95));
+    animation: gm-icon-pulse 1.5s ease-in-out infinite;
+  }
+  .glitch-msg .gm-icon svg { width: 100%; height: 100%; }
+  .glitch-msg .gm-icon path, .glitch-msg .gm-icon circle { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linejoin: round; }
+  @keyframes gm-icon-pulse {
+    0%, 100% { opacity: 0.7; transform: scale(0.95); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+  .glitch-msg .gm-body { min-width: 0; flex: 1; }
+  .glitch-msg .gm-title {
+    color: #ff3b3b; font-size: 12.5px; font-weight: 700; letter-spacing: 0.18em;
+    text-shadow: 0 0 8px rgba(255, 40, 40, 0.95);
+  }
+  .glitch-msg .gm-line {
+    color: #ff2a2a; font-size: 10.5px; line-height: 1.5; letter-spacing: 0.05em; margin-top: 2px;
+    white-space: nowrap; overflow: hidden;
+    text-shadow: 0 0 6px rgba(255, 30, 30, 0.9);
+  }
+  .glitch-msg .gm-scan {
+    position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(255, 60, 60, 0.16) 0 1px, transparent 1px 3px);
+    mix-blend-mode: screen;
+  }
+  .glitch-msg::after {
+    content: ''; position: absolute; inset: -40% -10%; pointer-events: none;
+    background: repeating-linear-gradient(118deg, rgba(255, 34, 34, 0.92) 0 12px, rgba(12, 0, 0, 0.3) 12px 30px);
+    opacity: 0;
+    animation: sig-swipe 3.4s steps(1, end) infinite;
+  }
+  .glitch-msg:nth-child(2)::after { animation-delay: 0.4s; }
+  .glitch-msg:nth-child(3)::after { animation-delay: 0.85s; }
+  @keyframes sig-swipe {
+    0%, 58%, 100% { opacity: 0; transform: translateX(-34%) skewY(0deg); }
+    60% { opacity: 0.96; transform: translateX(-8%) skewY(-5deg); }
+    66% { opacity: 0.9; transform: translateX(6%) skewY(4deg); }
+    72% { opacity: 0.55; transform: translateX(22%) skewY(-3deg); }
+    76% { opacity: 0; }
+  }
+
+  /* Standard Config Cards & Controls */
+  .card {
+    background: var(--panel); backdrop-filter: blur(14px);
+    border: 1px solid rgba(56, 189, 248, 0.15);
+    border-radius: 16px; margin-bottom: 16px; overflow: hidden;
+  }
+  .card-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .card-title { font-size: 15px; font-weight: 600; }
+  .card-sub { font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .badge {
+    font-family: 'Consolas', monospace; font-size: 10px; font-weight: 700;
+    padding: 3px 9px; border-radius: 6px;
+    background: rgba(56, 189, 248, 0.14); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.25);
+  }
+  .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 13px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .row:last-child { border-bottom: none; }
+  .row-info { flex: 1; }
+  .row-lbl { font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .row-hint { font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .row-actions { display: flex; align-items: center; gap: 10px; }
+  .sub-panel {
+    background: rgba(4, 7, 14, 0.55); border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 12px 20px; display: none; flex-direction: column; gap: 10px;
+  }
+  .sub-panel.open { display: flex; }
+
+  /* Pill Toggle Switch */
+  .switch {
+    position: relative; width: 44px; height: 24px; border-radius: 999px;
+    background: #172236; border: 1px solid rgba(255, 255, 255, 0.12);
+    cursor: pointer; transition: all 0.2s ease; flex-shrink: 0;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+    border-radius: 50%; background: #94a3b8; transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .switch.on { background: var(--accent); border-color: #7dd3fc; box-shadow: 0 0 12px rgba(56, 189, 248, 0.38); }
+  .switch.on::after { left: 23px; background: #040812; }
+  .switch.sm { width: 36px; height: 20px; }
+  .switch.sm::after { width: 12px; height: 12px; }
+  .switch.sm.on::after { left: 19px; }
+
+  /* Inputs & Small Buttons */
+  .input {
+    background: var(--sunk); color: var(--text);
+    border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 9px;
+    padding: 7px 11px; font-family: 'Consolas', monospace; font-size: 12px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.16); }
+  .input.center { text-align: center; width: 90px; }
+  .input.full { width: 100%; }
+  select.input { cursor: pointer; color-scheme: dark; background-color: var(--sunk); }
+  select.input option { background: #091224; color: #e2e8f0; }
+
+  /* Cyber-Glass Item Catalog Picker */
+  .catalog-trigger {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: linear-gradient(135deg, rgba(16, 29, 52, 0.92), rgba(9, 17, 32, 0.96));
+    color: var(--text); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 9px;
+    padding: 7px 13px; font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: all 0.16s ease; white-space: nowrap;
+  }
+  .catalog-trigger:hover, .catalog-trigger.open {
+    border-color: var(--accent); color: #fff;
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.24);
+  }
+  .catalog-drawer {
+    display: none; flex-direction: column; gap: 10px;
+    margin-bottom: 12px; padding: 12px; border-radius: 13px;
+    background: rgba(4, 8, 18, 0.88);
+    border: 1px solid rgba(56, 189, 248, 0.28);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 26px rgba(0, 0, 0, 0.45);
+  }
+  .catalog-drawer.open { display: flex; animation: fadeSlide 0.16s ease; }
+  .catalog-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .catalog-cats { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .cat-tab {
+    padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    background: rgba(15, 23, 42, 0.8); color: var(--subtext);
+    border: 1px solid rgba(255, 255, 255, 0.08); cursor: pointer; transition: all 0.14s ease;
+  }
+  .cat-tab:hover { color: var(--text); border-color: rgba(56, 189, 248, 0.35); }
+  .cat-tab.active {
+    background: rgba(56, 189, 248, 0.18); color: #7dd3fc;
+    border-color: rgba(56, 189, 248, 0.55); box-shadow: 0 0 10px rgba(56, 189, 248, 0.18);
+  }
+  .catalog-grid {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px;
+    max-height: 228px; overflow-y: auto; padding-right: 4px;
+  }
+  @media (max-width: 980px) { .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .catalog-grid::-webkit-scrollbar { width: 6px; }
+  .catalog-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 99px; }
+  .catalog-grid::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.32); border-radius: 99px; }
+  .catalog-grid::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.6); }
+  .catalog-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 7px;
+    padding: 8px 10px; border-radius: 10px; text-align: left;
+    background: rgba(11, 18, 32, 0.9); border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text); font-size: 12px; font-weight: 500; cursor: pointer;
+    transition: all 0.15s ease; min-width: 0;
+  }
+  .catalog-item:hover { border-color: rgba(56, 189, 248, 0.5); background: rgba(18, 30, 52, 0.95); transform: translateY(-1px); }
+  .catalog-item.added {
+    background: rgba(56, 189, 248, 0.14); border-color: rgba(56, 189, 248, 0.55); color: #e0f2fe;
+  }
+  .catalog-item-lbl { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .catalog-item-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .catalog-check { font-family: 'Consolas', monospace; font-size: 11px; font-weight: 700; color: var(--good); flex-shrink: 0; }
+  .item-ico-img {
+    width: 22px; height: 22px; border-radius: 5px; object-fit: contain; flex-shrink: 0;
+    background: rgba(6, 12, 24, 0.55); border: 1px solid rgba(255, 255, 255, 0.06); padding: 1px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+  }
+  .item-pill-lbl { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+  .btn-sm {
+    background: var(--panel-alt); color: var(--text);
+    border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 9px;
+    padding: 6px 12px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
+  }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); background: rgba(56, 189, 248, 0.12); }
+
+  /* Biome Gallery Grid */
+  .biome-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 16px 20px; }
+  .biome-tile {
+    background: var(--sunk); border: 1px solid rgba(56, 189, 248, 0.16);
+    border-radius: 13px; padding: 12px; display: flex; flex-direction: column; gap: 10px;
+    transition: border-color 0.18s;
+  }
+  .biome-tile:hover { border-color: rgba(56, 189, 248, 0.5); }
+  .biome-tile-top { display: flex; align-items: center; gap: 10px; }
+  .biome-tile-top img { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; border: 1px solid rgba(255,255,255,0.18); }
+  .biome-tile-actions { display: flex; justify-content: space-between; gap: 8px; }
+
+  /* Dynamic List Rows (Auto Pop / Shopping List) */
+  .list-stack { display: flex; flex-direction: column; gap: 8px; }
+  .item-pill-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 12px; border-radius: 10px; background: var(--sunk); border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .biome-group-box {
+    border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 12px;
+    background: rgba(7, 12, 24, 0.7); overflow: hidden;
+  }
+  .biome-group-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 12px; background: rgba(18, 30, 52, 0.65);
+  }
+
+  /* Logs Terminal */
+  .console-box {
+    margin: 0 20px 16px; padding: 12px; border-radius: 12px;
+    background: #03060c; border: 1px solid rgba(56, 189, 248, 0.18);
+    height: 220px; overflow-y: auto;
+    font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.55;
+  }
+  .log-line .ts { color: var(--dim); }
+  .log-line .tag { color: var(--accent); font-weight: 700; }
+  .log-line .tag.merchant { color: var(--warn); }
+  .log-line .tag.eden { color: var(--emerald); }
+  .log-line .tag.crash { color: var(--bad); }
+
+  /* Toast Banner */
+  #toast {
+    position: fixed; bottom: 22px; right: 26px; z-index: 99;
+    padding: 11px 18px; border-radius: 12px;
+    background: rgba(9, 17, 31, 0.96); border: 1px solid var(--accent);
+    color: var(--text); font-size: 13px; font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 18px rgba(56, 189, 248, 0.25);
+    opacity: 0; transform: translateY(10px); pointer-events: none;
+    transition: all 0.22s ease;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  .btn-danger {
+    padding: 7px 14px; border-radius: 9px;
+    background: rgba(248, 113, 113, 0.14); border: 1px solid rgba(248, 113, 113, 0.4);
+    color: #fca5a5; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .btn-danger:hover { background: rgba(248, 113, 113, 0.28); color: #fff; }
+
+  /* Driver.js Cyber-Glass Spotlight Tour Theme */
+  .driver-popover.mmacro-tour {
+    background: linear-gradient(160deg, rgba(11, 20, 38, 0.98), rgba(5, 10, 20, 0.98));
+    color: var(--text);
+    border: 1px solid rgba(56, 189, 248, 0.52);
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.72), 0 0 28px rgba(56, 189, 248, 0.22);
+    padding: 18px 20px;
+    max-width: 360px;
+  }
+  .driver-popover.mmacro-tour .driver-popover-title {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 15.5px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;
+  }
+  .driver-popover.mmacro-tour .driver-popover-description {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 12.5px; line-height: 1.55; color: #cbd5e1;
+  }
+  .driver-popover.mmacro-tour .driver-popover-description b { color: var(--accent); }
+  .driver-popover.mmacro-tour .driver-popover-progress-text {
+    font-family: 'Consolas', monospace; font-size: 11px; font-weight: 700; color: var(--accent);
+  }
+  .driver-popover.mmacro-tour .driver-popover-footer { margin-top: 14px; }
+  .driver-popover.mmacro-tour button {
+    background: rgba(18, 30, 52, 0.9); color: #e2e8f0;
+    border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 8px;
+    padding: 5px 12px; font-size: 12px; font-weight: 600; text-shadow: none;
+  }
+  .driver-popover.mmacro-tour button:hover { border-color: var(--accent); color: #fff; }
+  .driver-popover.mmacro-tour .driver-popover-next-btn {
+    background: linear-gradient(135deg, #38bdf8, #0284c7);
+    color: #030914; border-color: #38bdf8;
+  }
+  .driver-popover.mmacro-tour .driver-popover-next-btn:hover { color: #030914; filter: brightness(1.08); }
+  .driver-popover.mmacro-tour .driver-popover-close-btn {
+    background: transparent; border: none; color: var(--subtext); font-size: 18px;
+  }
+  .driver-popover.mmacro-tour .driver-popover-arrow-side-left.driver-popover-arrow { border-left-color: #0b1426; }
+  .driver-popover.mmacro-tour .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: #0b1426; }
+  .driver-popover.mmacro-tour .driver-popover-arrow-side-top.driver-popover-arrow { border-top-color: #0b1426; }
+  .driver-popover.mmacro-tour .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: #0b1426; }
+
+  /* GLITCHED corruption bursts: text and icons corrupt like the wiki example. */
+  body.rare-glitched.glitch-burst .app-shell *:not(img):not(svg):not(path):not(rect) {
+    text-shadow: 2px 0 rgba(239, 68, 68, 0.58), -2px 0 rgba(56, 189, 248, 0.58), 0 0 8px rgba(74, 222, 128, 0.22) !important;
+  }
+  body.rare-glitched.glitch-burst .app-shell img {
+    animation: glitch-image-jitter 90ms steps(1, end) infinite !important;
+  }
+  @keyframes glitch-image-jitter {
+    0%, 100% { filter: none; transform: translate(0, 0); }
+    33% { filter: grayscale(1) contrast(2.4) brightness(1.45); transform: translate(-1px, 0); }
+    66% { filter: invert(1) hue-rotate(70deg) saturate(2); transform: translate(1px, 0); }
+  }
+  body.rare-glitched.glitch-burst #heroEmblem {
+    filter: grayscale(1) contrast(2.8) brightness(1.45);
+  }
+  body.rare-glitched.glitch-burst #heroCard .hero-fx-layer::after {
+    content: '';
+    position: absolute; right: 13%; top: 15%;
+    width: 88px; height: 58px;
+    background: repeating-linear-gradient(135deg, rgba(248, 250, 252, 0.96) 0 7px, rgba(2, 6, 23, 0.98) 7px 14px);
+    border: 1px solid rgba(248, 250, 252, 0.45);
+    box-shadow: 0 0 18px rgba(248, 250, 252, 0.22);
+    transform: skewX(-10deg);
+    opacity: 0.92;
+  }
+  .glitch-striped { position: relative; overflow: hidden; }
+  .glitch-striped::after {
+    content: '';
+    position: absolute; z-index: 4; pointer-events: none;
+    background: repeating-linear-gradient(
+      var(--g-angle, 135deg),
+      var(--g-light, #f8fafc) 0 var(--g-size, 6px),
+      var(--g-dark, #020617) var(--g-size, 6px) calc(var(--g-size, 6px) * 2)
+    );
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.18);
+  }
+  .count-pill.glitch-striped::after {
+    left: 14px; top: 50%; width: 44px; height: 44px; border-radius: 11px;
+    transform: translateY(-50%);
+  }
+  .hist-item.glitch-striped::after {
+    left: 12px; top: 50%; width: 36px; height: 36px; border-radius: 9px;
+    transform: translateY(-50%);
+  }
+  .biome-emblem-wrap.glitch-striped::after { inset: 2px; border-radius: 16px; }
+  .avatar-ring.glitch-striped::after { inset: 0; border-radius: 50%; }
+  .brand-crest.glitch-striped::after { inset: 0; border-radius: 11px; }
+  .biome-pill.glitch-striped::after {
+    left: 6px; top: 50%; width: 18px; height: 18px; border-radius: 5px;
+    transform: translateY(-50%);
+  }
+  body.rare-glitched.glitch-burst #biomeCountsCard {
+    position: relative;
+  }
+  body.rare-glitched.glitch-burst #biomeCountsCard::after {
+    content: '';
+    position: absolute; left: 28%; right: 20px; top: 56px; height: 11px;
+    z-index: 5; pointer-events: none;
+    background: repeating-linear-gradient(135deg, #f8fafc 0 7px, #020617 7px 14px);
+    box-shadow: 0 0 10px rgba(248, 250, 252, 0.2);
+    transform: skewX(-12deg);
+    opacity: 0.9;
+  }
+</style>
+</head>
+<body>
+  <div class="ambient-bg" id="ambientBg"></div>
+  <div class="grid-overlay"></div>
+  <div id="appRareFx"></div>
+
+  <div class="app-shell">
+    <!-- Left Glass Sidebar -->
+    <aside class="sidebar">
+      <div class="brand" onclick="switchTab('dashboard')">
+        <div class="brand-crest">
+          <img src="/ui/brand_logo.png" alt="MMACRO" style="width:28px;height:28px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(56,189,248,0.7));" />
+        </div>
+        <div>
+          <div class="brand-title">MMACRO</div>
+          <div class="brand-sub">WEBVIEW HUD v1.1.4</div>
+        </div>
+      </div>
+
+      <div class="nav-label">MODULES</div>
+      <div class="nav-list" id="navList">
+        <div class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          <span>Dashboard</span>
+        </div>
+        <div class="nav-item" data-tab="macro" onclick="switchTab('macro')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
+          <span>Macro &amp; Core</span>
+          <span class="nav-dot" id="dot-macro"></span>
+        </div>
+        <div class="nav-item" data-tab="fishing" onclick="switchTab('fishing')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12c2-3 5-3 7 0s5 3 7 0 5-3 6 0"/><path d="M2 18c2-2 5-2 7 0s5 2 7 0 5-2 6 0"/><circle cx="12" cy="6" r="2.5"/></svg>
+          <span>Auto Fishing</span>
+          <span class="nav-dot" id="dot-fishing"></span>
+        </div>
+        <div class="nav-item" data-tab="items" onclick="switchTab('items')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6M10 3v5l-5 8a3 3 0 002.6 4.5h8.8A3 3 0 0019 16l-5-8V3"/></svg>
+          <span>Items &amp; Potions</span>
+          <span class="nav-dot" id="dot-items"></span>
+        </div>
+        <div class="nav-item" data-tab="merchant" onclick="switchTab('merchant')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>Merchants &amp; Eden</span>
+          <span class="nav-dot" id="dot-merchant"></span>
+        </div>
+        <div class="nav-item" data-tab="biomes" onclick="switchTab('biomes')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>
+          <span>Biome Counts</span>
+        </div>
+        <div class="nav-item" data-tab="credits" onclick="switchTab('credits')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>Activity &amp; Credits</span>
+        </div>
+        <div class="nav-item" data-tab="settings" onclick="switchTab('settings')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <span>Webhook</span>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="power-btn" id="sidePowerBtn" onclick="toggleRun()">
+          <span class="power-dot"></span>
+          <span id="sidePowerTxt">ENGAGE [F1]</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main">
+      <header class="topbar">
+        <div class="top-left">
+          <div class="title-line">
+            <h1 class="page-title" id="pageTitle">Dashboard</h1>
+            <div class="status-pill" id="statusPill">
+              <span class="pulse-dot"></span>
+              <span id="statusText">IDLE</span>
+            </div>
+          </div>
+          <div class="user-sub">
+            <span style="color:var(--accent)">◈</span>
+            <span id="playerName">Player</span>
+            <span class="mono">· SOL'S RNG CYBER HUD</span>
+          </div>
+        </div>
+
+        <div class="top-right">
+          <div class="tele-pill" id="robloxPill">
+            <span class="tele-dot"></span>
+            <span id="robloxText">ROBLOX: CHECKING</span>
+          </div>
+          <div class="tele-pill">
+            <span style="color:var(--accent)">⏱</span>
+            <span id="uptimeText">00:00:00</span>
+          </div>
+          <div class="tele-pill" id="topMostPill" style="cursor:pointer;gap:8px" title="Keep MMacro HUD above other windows" onclick="toggleOnTop()">
+            <span style="font-size:11px">ON TOP</span>
+            <div class="switch sm" id="topMostSwitch"></div>
+          </div>
+          <button class="btn-sm" id="tourTriggerBtn" onclick="openTutorial(0)" title="Start Interactive UI Walkthrough">? Tutorial</button>
+        </div>
+      </header>
+
+      <div class="scroll-area">
+        <!-- PAGE 1: DASHBOARD -->
+        <section class="page active" id="page-dashboard">
+          <div class="dash-grid">
+            <!-- Col 1: Hero Biome + Stats + Actions -->
+            <div>
+              <div class="glass-card hud-corners hero-card" id="heroCard">
+                <img class="hero-bg-img" id="heroBgImg" src="" alt="" />
+                <div class="hero-gradient"></div>
+                <div class="hero-fx-layer" id="heroFxLayer"></div>
+                <div class="hero-content">
+                  <div>
+                    <div class="micro-tag">BIOME SIGNAL</div>
+                    <div class="biome-emblem-wrap">
+                      <img class="biome-emblem" id="heroEmblem" src="" alt="Biome" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="hero-biome-name" id="heroBiomeName">Normal</div>
+                    <div class="hero-rate" id="heroBiomeRate">◈ 1/1/sec</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stats-pair">
+                <div class="glass-card hud-corners stat-box">
+                  <div class="stat-label">INSTANCES</div>
+                  <div class="stat-val" id="instCount">0</div>
+                </div>
+                <div class="glass-card hud-corners stat-box">
+                  <div class="stat-label">RARES</div>
+                  <div class="stat-val cyan" id="raresCount">0</div>
+                </div>
+              </div>
+
+              <button class="btn-primary" id="mainActionBtn" onclick="toggleRun()">▶ START MONITORING (F1)</button>
+            </div>
+
+            <!-- Col 2: Active Instance + Automation Matrix -->
+            <div>
+              <div class="sec-hdr">
+                <span>ACTIVE INSTANCE <span class="hl" id="activeInstBadge">(0)</span></span>
+              </div>
+              <div class="glass-card instance-card">
+                <img class="inst-banner" id="instBannerImg" src="" alt="" />
+                <div class="inst-fade"></div>
+                <div class="inst-top">
+                  <div class="avatar-ring" style="cursor:pointer" title="Click to manage Roblox Username & Avatar in Webhook tab" onclick="switchTab('settings')"><img id="instAvatarImg" src="/avatar.png" alt="Roblox Avatar" /></div>
+                  <div>
+                    <div class="inst-name" id="instPlayerName">Player</div>
+                    <div class="inst-aura" id="instAura">✦ None Equipped</div>
+                  </div>
+                </div>
+                <div class="inst-bottom">
+                  <div class="inst-biome-title" id="instBiomeTitle">Normal</div>
+                  <div class="biome-pill">
+                    <img id="instBiomePillImg" src="" alt="" />
+                    <span id="instBiomePillTxt">Normal</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="sec-hdr">
+                <span>AUTOMATION MATRIX</span>
+                <span style="color:var(--dim);font-size:10px">CLICK TO TOGGLE</span>
+              </div>
+              <div class="glass-card matrix-card">
+                <div class="matrix-grid" id="matrixGrid"></div>
+              </div>
+            </div>
+
+            <!-- Col 3: Recent History + Command Link -->
+            <div>
+              <div class="sec-hdr">
+                <span>RECENT HISTORY</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="color:var(--dim);font-size:11px">Rares</span>
+                  <div class="switch sm" id="rareFilterSwitch" onclick="toggleRareFilter()"></div>
+                </div>
+              </div>
+              <div class="hist-list" id="dashHistList"></div>
+
+              <div class="sec-hdr" style="margin-top:14px">
+                <span>COMMAND LINK</span>
+              </div>
+              <div class="glass-card cmd-card">
+                <div class="cmd-row">
+                  <span style="font-family:'Consolas',monospace;color:var(--dim);font-weight:700">WEBHOOK</span>
+                  <span id="whBadge" style="font-family:'Consolas',monospace;font-weight:700;color:var(--good)">● ARMED</span>
+                </div>
+                <div class="cmd-row" style="gap:8px;flex-wrap:wrap">
+                  <span style="font-family:'Consolas',monospace;color:var(--subtext);white-space:nowrap">F1 Start · F2 Stop</span>
+                  <div style="display:flex;gap:6px;margin-left:auto">
+                    <button class="btn-sm" onclick="testWebhook()">Test Webhook</button>
+                    <button class="btn-sm" onclick="openCalibrator('all')">Calibrate ↗</button>
+                  </div>
+                </div>
+                <div class="cmd-row" style="gap:6px;flex-wrap:wrap;padding-top:4px;border-top:1px solid rgba(255,255,255,0.06)">
+                  <span style="font-family:'Consolas',monospace;color:var(--dim);font-size:10.5px">FX PREVIEW</span>
+                  <div style="display:flex;gap:5px;margin-left:auto;flex-wrap:wrap">
+                    <button class="btn-sm" style="padding:4px 8px;font-size:11px;border-color:rgba(59,227,122,0.45);color:#4ade80" onclick="previewRareFx('GLITCHED')">⚡ Glitch</button>
+                    <button class="btn-sm" style="padding:4px 8px;font-size:11px;border-color:rgba(47,211,255,0.45);color:#7dd3fc" onclick="previewRareFx('CYBERSPACE')">🔓 Cyber</button>
+                    <button class="btn-sm" style="padding:4px 8px;font-size:11px;border-color:rgba(232,106,240,0.45);color:#f5d0fe" onclick="previewRareFx('DREAMSPACE')">✦ Dream</button>
+                    <button class="btn-sm" style="padding:4px 8px;font-size:11px" onclick="previewRareFx('NORMAL')">↺</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="glass-card dash-console-card" id="dashConsoleCard">
+            <div class="card-hdr" style="padding:12px 18px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="color:var(--accent)">▸</span>
+                <div class="card-title" style="font-size:13.5px">Live Activity Feed</div>
+              </div>
+              <button class="btn-sm" onclick="switchTab('credits')">Open Activity &amp; Filters ↗</button>
+            </div>
+            <div class="dash-console-box" id="dashConsoleBox"></div>
+            <div class="glitch-msg-stack" id="glitchMsgStack" aria-hidden="true"></div>
+          </div>
+        </section>
+
+        <!-- PAGE 2: MACRO & CORE -->
+        <section class="page" id="page-macro">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Core Automation &amp; Aura Handling</div><div class="card-sub">Anti-AFK protection, rare aura video clipping, and Aura Storage re-equip</div></div>
+              <span class="badge">CORE</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Anti-AFK Protection</div><div class="row-hint">Jumps every 5 minutes so Roblox never kicks you for idling</div></div>
+              <div class="switch" id="sw-anti_afk" onclick="toggleCfg('anti_afk')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Clip Rare Auras</div><div class="row-hint">Automatically records or triggers your replay hotkey when a rare aura rolls</div></div>
+              <div class="row-actions">
+                <button class="btn-sm" onclick="apiCall('open_clips')">🎬 Open Clips</button>
+                <div class="switch" id="sw-clip_on" onclick="toggleCfg('clip_on')"></div>
+              </div>
+            </div>
+            <div class="sub-panel" id="sub-clip_on">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <span style="font-size:12px;color:var(--subtext)">Min Rarity (1 in):</span>
+                <input class="input center" style="width:140px" id="inp-clip_min" onchange="saveField('clip_min', this.value)" />
+                <span style="font-size:12px;color:var(--subtext)">Resolution:</span>
+                <button class="btn-sm" id="btn-clip_quality" onclick="cycleQuality()">768p</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <div class="switch sm" id="sw-clip_key_on" onclick="toggleCfg('clip_key_on')"></div>
+                <span style="font-size:12px;color:var(--subtext)">Use external recorder hotkey (Medal / Game Bar / ShadowPlay):</span>
+                <button class="btn-sm" id="btn-clip_keys" onclick="captureClipKey()">Win+Alt+G</button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Keep an Aura Equipped</div><div class="row-hint">Automatically re-equips your chosen aura from Aura Storage after rolling</div></div>
+              <div class="switch" id="sw-equip_on" onclick="toggleCfg('equip_on')"></div>
+            </div>
+            <div class="sub-panel" id="sub-equip_on">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:12px;color:var(--subtext)">Aura Name:</span>
+                <input class="input" style="width:240px" id="inp-equip_aura" onblur="resolveAuraInput()" onkeydown="if(event.key==='Enter')resolveAuraInput()" />
+                <span id="auraMatchHint" style="font-size:12px;color:var(--good)"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Connection &amp; Performance</div><div class="card-sub">Smart private server reconnect, button calibration, and low-spec pacing</div></div>
+              <span class="badge">SYSTEM</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Smart Auto Reconnect</div><div class="row-hint">Detects disconnects or freezes and rejoins your private server</div></div>
+              <div class="row-actions">
+                <button class="btn-sm" onclick="openCalibrator('play')">🎯 Set Play</button>
+                <div class="switch" id="sw-auto_reconnect" onclick="toggleCfg('auto_reconnect')"></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Rejoin Through Browser</div><div class="row-hint">Launch private server links via your default browser if deeplinks fail</div></div>
+              <div class="switch" id="sw-rejoin_browser" onclick="toggleCfg('rejoin_browser')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Button Coordinates</div><div class="row-hint">Auto-scaled for 1080p/768p; open Calibrator only if clicks miss</div></div>
+              <button class="btn-sm" onclick="openCalibrator('all')">🎯 Open Calibrator</button>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Potato PC Mode</div><div class="row-hint">Doubles menu and click wait intervals for slower or high-ping PCs</div></div>
+              <div class="switch" id="sw-low_end" onclick="toggleCfg('low_end')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto-Update on Launch</div><div class="row-hint">Automatically downloads and installs new updates whenever you open MMacro HUD</div></div>
+              <div class="row-actions">
+                <span class="mono" style="font-size:11px;color:var(--dim)" id="updateStatusText">Up to date</span>
+                <button class="btn-sm" onclick="checkUpdatesNow()">↻ Check Update</button>
+                <div class="switch" id="sw-auto_update" onclick="toggleCfg('auto_update')"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 3: AUTO FISHING -->
+        <section class="page" id="page-fishing">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Automated Ocean Fishing &amp; Selling</div><div class="card-sub">Walks to Captain Flarg &amp; the ocean spot, reels catches, and sells inventory</div></div>
+              <span class="badge">FISHING</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Enable Auto Fishing</div><div class="row-hint">Cannot run simultaneously with Eden Detector</div></div>
+              <div class="switch" id="sw-fish_on" onclick="toggleExclusive('fish_on','eden_on','Eden Detector')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">VIP Walk Speed</div><div class="row-hint">Uses VIP movement timing when walking to Captain Flarg and the spot</div></div>
+              <div class="switch" id="sw-fish_vip" onclick="toggleCfg('fish_vip')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Sell Every N Catches</div><div class="row-hint">Number of fish caught before visiting Captain Flarg (0 = disabled)</div></div>
+              <input class="input center" id="inp-fish_sell" onchange="saveInt('fish_sell', this.value, 0)" />
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Sell Entire Bag</div><div class="row-hint">Sells every fish species in your inventory when visiting Captain Flarg</div></div>
+              <div class="switch" id="sw-fish_sell_all" onclick="toggleCfg('fish_sell_all')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Full Bag Detection</div><div class="row-hint">Automatically sells when "Cannot Fish / not enough inventory space" shows</div></div>
+              <div class="switch" id="sw-fish_full_check" onclick="toggleCfg('fish_full_check')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Sell Species Count</div><div class="row-hint">Kinds of fish sold per trip when Sell Entire Bag is turned off</div></div>
+              <input class="input center" id="inp-fish_sell_amount" onchange="saveInt('fish_sell_amount', this.value, 1)" />
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 4: ITEMS & AUTO POP -->
+        <section class="page" id="page-items">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Scheduled Item Automation</div><div class="card-sub">Strange Controller (20m), Biome Randomizer (35m), Cursed Rune &amp; Biome Selector</div></div>
+              <span class="badge">COOLDOWNS</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto SC + BR</div><div class="row-hint">Uses Strange Controller &amp; Biome Randomizer outside rare biomes</div></div>
+              <div class="switch" id="sw-auto_items" onclick="toggleCfg('auto_items')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto Cursed Rune Fragment</div><div class="row-hint">Uses a Cursed Rune Fragment after a chosen event biome runs for N seconds</div></div>
+              <div class="switch" id="sw-rune_on" onclick="toggleCfg('rune_on')"></div>
+            </div>
+            <div class="sub-panel" id="sub-rune_on">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+                <span style="font-size:12px;color:var(--subtext)">Target Biomes:</span>
+                <div style="display:flex;gap:14px;align-items:center">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-rune-PUMPKIN MOON" onclick="toggleRuneBiome('PUMPKIN MOON')"></div> Pumpkin Moon</label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-rune-GRAVEYARD" onclick="toggleRuneBiome('GRAVEYARD')"></div> Graveyard</label>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:12px;color:var(--subtext)">Use After Delay (seconds):</span>
+                <input class="input center" id="inp-rune_after" onchange="saveInt('rune_after', this.value, 0)" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto Biome Selector</div><div class="row-hint">Activates your chosen Drive every hour when off cooldown</div></div>
+              <div class="switch" id="sw-selector_on" onclick="toggleCfg('selector_on')"></div>
+            </div>
+            <div class="sub-panel" id="sub-selector_on">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:12px;color:var(--subtext)">Target Biome Drive:</span>
+                <select class="input" id="sel-selector_biome" onchange="saveField('selector_biome', this.value)"></select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Auto Pop Potions on Biome Start</div><div class="card-sub">Automatically opens Inventory and uses configured potion stacks per biome</div></div>
+              <span class="badge">POTIONS</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Enable Auto Pop</div><div class="row-hint">Triggers as soon as a configured biome starts</div></div>
+              <div class="switch" id="sw-pop_on" onclick="toggleCfg('pop_on')"></div>
+            </div>
+            <div class="sub-panel" id="sub-pop_on">
+              <div style="display:flex;gap:8px;align-items:center">
+                <select class="input" id="addPopBiomeSelect"></select>
+                <button class="btn-sm" onclick="addPopBiome()">＋ Add Biome Trigger</button>
+              </div>
+              <div class="list-stack" id="popListContainer"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 5: MERCHANTS & EDEN -->
+        <section class="page" id="page-merchant">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Merchant Detection &amp; Auto-Collection</div><div class="card-sub">Monitors Roblox cache for Mari, Jester, Rin, Sinister S. &amp; Sinister P.</div></div>
+              <span class="badge">SHOP</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Merchant &amp; Boss Detection</div><div class="row-hint">Watches rbx-storage.db and posts arrival alerts to Discord</div></div>
+              <div class="switch" id="sw-merchant_on" onclick="toggleCfg('merchant_on')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto Merchant Collection</div><div class="row-hint">Teleports to selected merchants, reads stock via OCR, and buys items below</div></div>
+              <div class="switch" id="sw-collect_on" onclick="toggleCfg('collect_on')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Teleport To Merchants</div><div class="row-hint">Choose which merchants trigger teleportation</div></div>
+              <div style="display:flex;gap:12px;align-items:center">
+                <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-merch-Jester" onclick="toggleMerchName('Jester')"></div> Jester</label>
+                <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-merch-Mari" onclick="toggleMerchName('Mari')"></div> Mari</label>
+                <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-merch-Rin" onclick="toggleMerchName('Rin')"></div> Rin</label>
+              </div>
+            </div>
+            <div style="padding:14px 20px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-size:13px;font-weight:600">Shopping List (Leave Qty empty to buy max stock)</span>
+                <span class="badge" id="buyCountBadge">0 selected</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                <button type="button" class="catalog-trigger" id="catalogToggleBtn" onclick="toggleCatalog()">
+                  <span>📋</span>
+                  <span id="catalogBtnText">Browse Catalog</span>
+                  <span style="color:var(--accent);font-size:10px" id="catalogChevron">▾</span>
+                </button>
+                <input class="input" style="flex:1;min-width:160px" id="customItemInput" placeholder="Search or type item name..." onkeydown="if(event.key==='Enter')addBuyItem()" />
+                <button class="btn-sm" onclick="addBuyItem()">＋ Add Item</button>
+              </div>
+              <div class="catalog-drawer" id="catalogDrawer">
+                <div class="catalog-bar">
+                  <div class="catalog-cats" id="catalogCats">
+                    <button type="button" class="cat-tab active" onclick="setCatalogCat('all')">All</button>
+                    <button type="button" class="cat-tab" onclick="setCatalogCat('potions')">🧪 Potions</button>
+                    <button type="button" class="cat-tab" onclick="setCatalogCat('runes')">🪨 Runes</button>
+                    <button type="button" class="cat-tab" onclick="setCatalogCat('gear')">✨ Gear &amp; Special</button>
+                  </div>
+                  <input class="input" style="width:170px;padding:5px 9px;font-size:11.5px" id="catalogSearchInput" placeholder="Filter catalog..." oninput="renderCatalog()" />
+                </div>
+                <div class="catalog-grid" id="catalogGrid"></div>
+              </div>
+              <div class="list-stack" id="buyListContainer"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Eden Detection &amp; Contract Automation</div><div class="card-sub">Multi-scale template matching, Limbo pathing, and contract signing</div></div>
+              <span class="badge">LIMBO</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Eden Detector</div><div class="row-hint">Cannot run simultaneously with Auto Fishing</div></div>
+              <div class="switch" id="sw-eden_on" onclick="toggleExclusive('eden_on','fish_on','Auto Fishing')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Walk to Eden &amp; Sign Contract</div><div class="row-hint">Aligns camera via Collection, walks to Eden, and presses Contract</div></div>
+              <div class="row-actions">
+                <button class="btn-sm" onclick="openCalibrator('contract')">🎯 Set Contract</button>
+                <div class="switch" id="sw-eden_path" onclick="toggleCfg('eden_path')"></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Record 60s Eden Video</div><div class="row-hint">Saves an AVI recording in %LOCALAPPDATA%\MMacro when Eden spawns</div></div>
+              <div class="switch" id="sw-eden_record" onclick="toggleCfg('eden_record')"></div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Discord User ID to Mention (@ping)</div><div class="row-hint">Optional numeric Discord User ID pinged when Eden spawns</div></div>
+              <input class="input" style="width:210px" id="inp-eden_ping" onchange="saveField('eden_ping', this.value)" />
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 6: BIOME COUNTS (READ-ONLY) -->
+        <section class="page" id="page-biomes">
+          <div class="glass-card counts-card" id="biomeCountsCard" style="margin-top:0">
+            <div class="counts-hdr">
+              <div class="counts-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--subtext)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>
+                <span>Biome Counts</span>
+              </div>
+              <span class="counts-badge" id="biomeCountsBadge">Synced · 0 total</span>
+            </div>
+            <div class="biome-counts-grid" id="biomeCountsGrid"></div>
+          </div>
+        </section>
+
+        <!-- PAGE 7: ACTIVITY & CREDITS -->
+        <section class="page" id="page-credits">
+          <div class="card" id="supportCard">
+            <div class="card-hdr">
+              <div>
+                <div class="card-title">Developer Remote Support · One-Time Code</div>
+                <div class="card-sub">Give this code to a developer to share live logs, screen preview, and macro controls until you disconnect</div>
+              </div>
+              <span class="badge" id="supportBadge" style="color:var(--dim)">● OFFLINE</span>
+            </div>
+            <div style="padding:14px 20px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <div class="mono" id="supportCodeBox" style="padding:9px 16px;border-radius:10px;background:rgba(4,8,18,0.92);border:1px solid rgba(56,189,248,0.28);font-size:18px;font-weight:700;letter-spacing:3px;color:var(--dim)">---- - ----</div>
+                <button class="btn-sm" id="supportCopyBtn" style="display:none" onclick="copySupportCode()">📋 Copy Code</button>
+                <button class="btn-sm" id="supportStartBtn" style="border-color:rgba(56,189,248,0.55);color:#7dd3fc" onclick="startSupportSession()">🔑 Generate Code</button>
+                <button class="btn-sm" id="supportStopBtn" style="display:none;border-color:rgba(248,113,113,0.55);color:#fca5a5" onclick="stopSupportSession()">⛔ Disconnect Dev</button>
+              </div>
+              <div id="supportMetaLine" style="font-size:11.5px;color:var(--dim);font-family:'Consolas',monospace">No active support session. Dev cannot view or control your macro without your code.</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <input class="input" style="flex:1;min-width:220px" id="inp-supportRelay" placeholder="Optional Relay URL for cross-network support (leave empty for same PC / LAN)" />
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:12px;color:var(--subtext)">Allow Dev Click/Key inside Roblox</span>
+                  <div class="switch sm" id="sw-supportInput" onclick="toggleSupportInput()"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Live Activity Console</div><div class="card-sub">Real-time event stream from MMacro modules and Roblox log watcher</div></div>
+              <div style="display:flex;gap:6px">
+                <button class="btn-sm" onclick="clearLogs()">Clear</button>
+                <button class="btn-sm" onclick="apiCall('open_data_folder')">📁 Data Folder</button>
+                <button class="btn-sm" onclick="apiCall('open_dev_console')">🛠 Dev Console</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;padding:10px 20px;flex-wrap:wrap" id="logFilters">
+              <button class="btn-sm" onclick="setLogFilter('all')">All</button>
+              <button class="btn-sm" onclick="setLogFilter('ai')">AI</button>
+              <button class="btn-sm" onclick="setLogFilter('run')">Run</button>
+              <button class="btn-sm" onclick="setLogFilter('biomes')">Biomes</button>
+              <button class="btn-sm" onclick="setLogFilter('merchant')">Merchant</button>
+              <button class="btn-sm" onclick="setLogFilter('fishing')">Fishing</button>
+              <button class="btn-sm" onclick="setLogFilter('eden')">Eden</button>
+              <button class="btn-sm" onclick="setLogFilter('clip')">Clip</button>
+            </div>
+            <div class="console-box" id="consoleBox"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Creators &amp; Community</div><div class="card-sub">MMacro v1.1.4 · Open-source GPL-3.0 automation for Sol's RNG</div></div>
+              <button class="btn-sm" onclick="apiCall('open_discord')">💬 Join Discord</button>
+            </div>
+            <div class="row">
+              <div style="display:flex;align-items:center;gap:14px">
+                <img src="/axolotl.png" style="width:52px;height:52px;border-radius:12px;object-fit:cover" />
+                <div><div class="row-lbl">Manas</div><div class="row-hint">Solo developer and creator of MMacro</div></div>
+              </div>
+            </div>
+            <div class="row">
+              <div style="display:flex;align-items:center;gap:14px">
+                <img src="/coteab.png" style="width:52px;height:52px;border-radius:12px;object-fit:cover" />
+                <div><div class="row-lbl">@criticize.</div><div class="row-hint">Fishing logic from Coteab</div></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Community Testers</div><div class="row-hint" id="testersLine"></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 8: WEBHOOK & PROFILE -->
+        <section class="page" id="page-settings">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Discord Webhook &amp; Private Server</div><div class="card-sub">Rare biomes (Glitched, Dreamspace, Cyberspace) automatically @everyone ping with biome photos</div></div>
+              <span class="badge">WEBHOOK</span>
+            </div>
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+              <div>
+                <div class="row-lbl" style="margin-bottom:6px">Discord Webhook URL</div>
+                <div style="display:flex;gap:8px">
+                  <input class="input" type="password" style="flex:1" id="inp-webhook_url" oninput="autoSaveField('webhook_url', this.value)" onchange="saveField('webhook_url', this.value)" />
+                  <button class="btn-sm" id="toggleWhBtn" onclick="toggleWhVis()">Show</button>
+                  <button class="btn-sm" onclick="testWebhook()">🔔 Test Webhook</button>
+                </div>
+              </div>
+              <div>
+                <div class="row-lbl" style="margin-bottom:6px">Private Server Share Link</div>
+                <input class="input full" id="inp-private_server" oninput="autoSaveField('private_server', this.value)" onchange="saveField('private_server', this.value)" />
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Roblox Profile</div><div class="card-sub">Set your Roblox username for the Dashboard &amp; sync your avatar headshot</div></div>
+              <span class="badge">PROFILE</span>
+            </div>
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+              <div>
+                <div class="row-lbl" style="margin-bottom:6px">Roblox Username</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <input class="input" style="flex:1;min-width:200px" id="inp-roblox_username" placeholder="Leave empty to auto-detect from Roblox" oninput="autoSaveField('roblox_username', this.value)" onchange="applyRobloxUsername()" onkeydown="if(event.key==='Enter')applyRobloxUsername()" />
+                  <button class="btn-sm" onclick="applyRobloxUsername()">✓ Save Username</button>
+                  <button class="btn-sm" onclick="pickAvatarPhoto()">🖼 Set Avatar Photo...</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">New User Setup &amp; Reset</div><div class="card-sub">All changes auto-save automatically. Reset clears all saved settings &amp; history for a brand-new user.</div></div>
+              <span class="badge" id="autoSaveBadge">✓ AUTO-SAVE ON</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Replay Macro Tutorial</div><div class="row-hint">Step-by-step guide covering Roblox setup, webhooks, calibration &amp; hotkeys</div></div>
+              <button class="btn-sm" onclick="openTutorial(0)">📖 Open Tutorial</button>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Reset Everything (Fresh User)</div><div class="row-hint">Erases webhook URL, private server, shopping list, history &amp; custom avatar</div></div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-danger" id="resetBtn" onclick="requestResetAll()">🔄 Reset Everything</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="rareSpawnBanner"><span id="rareBannerIcon">✦</span><span id="rareBannerText">RARE BIOME SPAWNED</span></div>
+  <div id="toast"></div>
+
+<script>
+let STATE = null;
+let LOG_FILTER = 'all';
+let RARE_ONLY = false;
+let ON_TOP = false;
+let RESET_ARMED = false;
+let ACTIVE_TOUR = null;
+const _autoTimers = {};
+
+function escHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
+function escJs(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')                  // HTML attribute context: no entity smuggling
+    .replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+    .replace(/</g, '\\x3c').replace(/>/g, '\\x3e')
+    .replace(/"/g, '\\x22').replace(/\r/g, '').replace(/\n/g, '\\n');
+}
+
+function _tourGo(tab, elSelector, scrollTop = null) {
+  switchTab(tab);
+  const sc = document.querySelector('.scroll-area');
+  if (sc && scrollTop !== null) sc.scrollTop = scrollTop;
+  else if (elSelector) {
+    const el = document.querySelector(elSelector);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function openTutorial() {
+  if (!window.driver || !window.driver.js || !window.driver.js.driver) {
+    showToast('Tutorial tour library not loaded');
+    return;
+  }
+  if (ACTIVE_TOUR) {
+    try { ACTIVE_TOUR.destroy(); } catch (e) {}
+  }
+
+  _tourGo('dashboard', null, 0);
+
+  const tourSteps = [
+    {
+      tab: 'dashboard', scroll: 0,
+      popover: {
+        title: '👋 Welcome to MMacro HUD',
+        description: 'Let’s take a live guided tour around every screen so you know how the macro works.<br><br><b>Before starting:</b> Keep Roblox in <b>Windowed mode</b> (no F11 fullscreen) and <b>never</b> run Roblox as Administrator.'
+      }
+    },
+    {
+      tab: 'dashboard', scroll: 0,
+      element: '#heroCard',
+      popover: {
+        title: '◈ Live Biome Signal',
+        description: 'Reads your active Sol’s RNG log in real time and shows the current biome photo & spawn odds. Rare biomes automatically update your Discord embeds.',
+        side: 'right', align: 'start'
+      }
+    },
+    {
+      tab: 'dashboard', scroll: 0,
+      element: '#mainActionBtn',
+      popover: {
+        title: '▶ Start & Stop Monitoring (F1 / F2)',
+        description: 'Click here — or press <b>F1</b> anytime — to start automation, and press <b>F2</b> to stop safely even while inside Roblox.',
+        side: 'right'
+      }
+    },
+    {
+      tab: 'dashboard', scroll: 0,
+      element: '#matrixGrid',
+      popover: {
+        title: '⚡ Automation Matrix',
+        description: 'One-click toggles for all 9 core systems: Anti-AFK, Aura Clip, Auto Equip, Reconnect, Auto SC/BR, Auto Pop, Fishing, Merchants & Eden Hunt. Every click auto-saves.',
+        side: 'left'
+      }
+    },
+    {
+      tab: 'dashboard', scroll: 0,
+      element: '#topMostPill',
+      popover: {
+        title: '📌 ON TOP Pin Switch',
+        description: 'Turn <b>ON TOP</b> blue to float MMacro HUD above other windows, or leave it dark (OFF) so Roblox, Discord & browsers stack normally in front.',
+        side: 'bottom'
+      }
+    },
+    {
+      tab: 'items', scroll: 0,
+      element: '#page-items .card:first-child',
+      popover: {
+        title: '🧪 Items, Cursed Rune & Biome Drives',
+        description: 'Automatically fires <b>Strange Controller</b> (20m), <b>Biome Randomizer</b> (35m), <b>Cursed Rune Fragment</b>, and hourly <b>Biome Selector</b> drives. Scroll down here to build per-biome <b>Auto Pop</b> potion stacks.',
+        side: 'bottom'
+      }
+    },
+    {
+      tab: 'merchant', scroll: 0,
+      element: '#page-merchant .card:first-child',
+      popover: {
+        title: '🛒 Merchant Detection & Auto-Buy',
+        description: 'Monitors Roblox’s cache for <b>Mari</b>, <b>Jester</b>, <b>Rin</b> & bosses, teleports & reads shop stock via OCR, and buys your Shopping List.<br><br><b>Tip:</b> Turn on Detection first before Collection. Note <b>Auto Fishing</b> & <b>Eden Detector</b> cannot run together.',
+        side: 'bottom'
+      }
+    },
+    {
+      tab: 'biomes', scroll: 0,
+      element: '#biomeCountsCard',
+      popover: {
+        title: '🌐 Synced Biome Counts',
+        description: 'Tracks every biome rolled across your sessions (<b>Glitched</b>, <b>Dreamspace</b>, <b>Cyberspace</b>, weather & events) synced automatically from history.',
+        side: 'bottom'
+      }
+    },
+    {
+      tab: 'settings', scroll: 0,
+      element: '#page-settings .card:first-child',
+      popover: {
+        title: '🔔 Discord Webhook & Private Server',
+        description: 'Paste your Discord Webhook URL + Private Server share link here. <b>Glitched</b>, <b>Dreamspace</b> & <b>Cyberspace</b> automatically ping <b>@everyone</b>.<br><br>Click <b>Test Webhook</b> to verify safely (never leaks your server link).',
+        side: 'bottom'
+      }
+    },
+    {
+      tab: 'settings', scroll: 999,
+      element: '#page-settings .card:nth-child(3)',
+      popover: {
+        title: '💾 Auto-Save & Fresh User Reset',
+        description: 'Everything auto-saves automatically as you edit. Sharing the app or starting clean? Click <b>Reset Everything</b> anytime — or replay this tour from <b>? Tutorial</b> at the top-right!',
+        side: 'top'
+      }
+    }
+  ];
+
+  let driverObj = null;
+  let lastTab = 'dashboard';
+  const stepTo = (idx) => {
+    if (!driverObj) return;
+    if (idx >= tourSteps.length) {
+      driverObj.destroy();
+      return;
+    }
+    if (idx < 0) return;
+    const s = tourSteps[idx];
+    const tabChanged = (s.tab || 'dashboard') !== lastTab;
+    lastTab = s.tab || 'dashboard';
+    _tourGo(lastTab, s.element || null, s.scroll ?? 0);
+    setTimeout(() => { if (driverObj) driverObj.moveTo(idx); }, tabChanged ? 230 : 30);
+  };
+
+  driverObj = window.driver.js.driver({
+    showProgress: true,
+    animate: true,
+    smoothScroll: true,
+    allowClose: true,
+    stagePadding: 10,
+    stageRadius: 14,
+    overlayOpacity: 0.78,
+    popoverClass: 'mmacro-tour',
+    nextBtnText: 'Next →',
+    prevBtnText: '← Back',
+    doneBtnText: '✓ Finish Tour',
+    steps: tourSteps,
+    onNextClick: (el, step, opts) => {
+      const idx = (opts?.state?.activeIndex ?? 0) + 1;
+      stepTo(idx);
+    },
+    onPrevClick: (el, step, opts) => {
+      const idx = (opts?.state?.activeIndex ?? 0) - 1;
+      stepTo(idx);
+    },
+    onDestroyStarted: () => {
+      ACTIVE_TOUR = null;
+      driverObj.destroy();
+      _tourGo('dashboard', null, 0);
+      finishTutorial();
+    }
+  });
+
+  ACTIVE_TOUR = driverObj;
+  driverObj.drive();
+}
+
+async function finishTutorial() {
+  if (STATE && STATE.cfg && !STATE.cfg.tutorial_seen) {
+    STATE.cfg.tutorial_seen = true;
+    await apiCall('update_cfg', { tutorial_seen: true });
+    showToast('Tutorial complete! Press F1 anytime to start.');
+  }
+}
+
+function autoSaveField(key, val) {
+  if (STATE && STATE.cfg) STATE.cfg[key] = val;
+  clearTimeout(_autoTimers[key]);
+  _autoTimers[key] = setTimeout(async () => {
+    const badge = document.getElementById('autoSaveBadge');
+    if (badge) badge.textContent = '⟳ SAVING...';
+    await apiCall('update_cfg', { [key]: val });
+    if (badge) badge.textContent = '✓ AUTO-SAVED';
+  }, 420);
+}
+
+async function requestResetAll() {
+  const btn = document.getElementById('resetBtn');
+  if (!RESET_ARMED) {
+    RESET_ARMED = true;
+    btn.textContent = '⚠ Click Again to Confirm Reset';
+    setTimeout(() => { RESET_ARMED = false; if (btn) btn.textContent = '🔄 Reset Everything'; }, 4000);
+    return;
+  }
+  RESET_ARMED = false;
+  btn.textContent = '🔄 Reset Everything';
+  const s = await apiCall('reset_all_data');
+  if (s) { STATE = s; renderAll(); }
+  showToast('All settings & history reset to fresh user defaults');
+  openTutorial(0);
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+async function apiCall(name, ...args) {
+  if (!window.pywebview || !window.pywebview.api) return null;
+  return await window.pywebview.api[name](...args);
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  document.querySelectorAll('.page').forEach(el => el.classList.toggle('active', el.id === 'page-' + tab));
+  const titles = {
+    dashboard: 'Dashboard', macro: 'Macro & Core', fishing: 'Auto Fishing',
+    items: 'Items & Potions', merchant: 'Merchants & Eden',
+    biomes: 'Biome Counts', credits: 'Activity & Credits', settings: 'Webhook'
+  };
+  document.getElementById('pageTitle').textContent = titles[tab] || 'Dashboard';
+}
+
+function setSw(id, on) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('on', !!on);
+}
+
+function setSub(id, open) {
+  const el = document.getElementById('sub-' + id);
+  if (el) el.classList.toggle('open', !!open);
+}
+
+async function toggleCfg(key) {
+  STATE.cfg[key] = !STATE.cfg[key];
+  await apiCall('update_cfg', { [key]: STATE.cfg[key] });
+  renderAll();
+}
+
+async function toggleExclusive(key, otherKey, otherLabel) {
+  const next = !STATE.cfg[key];
+  if (next && STATE.cfg[otherKey]) {
+    showToast(`Turn off ${otherLabel} first — Fishing and Eden cannot run together.`);
+    return;
+  }
+  STATE.cfg[key] = next;
+  await apiCall('update_cfg', { [key]: next });
+  renderAll();
+}
+
+async function saveField(key, val) {
+  STATE.cfg[key] = val;
+  await apiCall('update_cfg', { [key]: val });
+  renderAll();
+}
+
+async function saveInt(key, val, minVal) {
+  const n = Math.max(minVal, parseInt(val || '0', 10) || minVal);
+  STATE.cfg[key] = n;
+  await apiCall('update_cfg', { [key]: n });
+  renderAll();
+}
+
+async function resolveAuraInput() {
+  const inp = document.getElementById('inp-equip_aura');
+  const res = await apiCall('resolve_aura', inp.value);
+  if (res && res.matched) {
+    inp.value = res.matched;
+    STATE.cfg.equip_aura = res.matched;
+    document.getElementById('auraMatchHint').textContent = '✓ Matched: ' + res.matched;
+    document.getElementById('auraMatchHint').style.color = 'var(--good)';
+  } else if (!inp.value.trim()) {
+    STATE.cfg.equip_aura = '';
+    document.getElementById('auraMatchHint').textContent = '';
+  } else {
+    document.getElementById('auraMatchHint').textContent = 'No matching aura found';
+    document.getElementById('auraMatchHint').style.color = 'var(--bad)';
+  }
+}
+
+async function cycleQuality() {
+  const list = ['768p', '1080p', '1440p', '4K'];
+  const cur = STATE.cfg.clip_quality || '768p';
+  const next = list[(list.indexOf(cur) + 1) % list.length];
+  await saveField('clip_quality', next);
+}
+
+async function captureClipKey() {
+  const btn = document.getElementById('btn-clip_keys');
+  btn.textContent = 'Press hotkey... (Esc cancels)';
+  const res = await apiCall('capture_clip_key');
+  if (res && res.ok) showToast('Clip hotkey set to ' + res.keys);
+  await refreshState();
+}
+
+async function toggleRuneBiome(name) {
+  const list = Array.isArray(STATE.cfg.rune_biomes) ? [...STATE.cfg.rune_biomes] : ['PUMPKIN MOON', 'GRAVEYARD'];
+  const idx = list.indexOf(name);
+  if (idx >= 0) list.splice(idx, 1); else list.push(name);
+  await saveField('rune_biomes', list);
+}
+
+async function toggleMerchName(name) {
+  const list = Array.isArray(STATE.cfg.collect_merchants) ? [...STATE.cfg.collect_merchants] : ['Jester', 'Mari', 'Rin'];
+  const idx = list.indexOf(name);
+  if (idx >= 0) list.splice(idx, 1); else list.push(name);
+  await saveField('collect_merchants', list);
+}
+
+let CATALOG_OPEN = false;
+let CATALOG_CAT = 'all';
+
+function _itemMeta(name) {
+  const low = (name || '').toLowerCase();
+  if (low.includes('rune')) return ['runes', '🪨'];
+  if (low.includes('potion') || low.includes('spoid')) return ['potions', '🧪'];
+  if (low.includes('coin') || low.includes('penny')) return ['gear', '🪙'];
+  if (low.includes('gear')) return ['gear', '⚙️'];
+  return ['gear', '✨'];
+}
+
+function _itemSlug(name) {
+  return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+function _itemIconHtml(name, fallback, size = 22) {
+  const slug = _itemSlug(name);
+  const fb = (fallback || '✨').replace(/'/g, '');
+  return `<img class="item-ico-img" src="/ui/items/${slug}.png" alt="" style="width:${size}px;height:${size}px" onerror="this.outerHTML='<span style=&quot;flex-shrink:0&quot;>${fb}</span>'" />`;
+}
+
+function toggleCatalog() {
+  CATALOG_OPEN = !CATALOG_OPEN;
+  const drw = document.getElementById('catalogDrawer');
+  const btn = document.getElementById('catalogToggleBtn');
+  const chv = document.getElementById('catalogChevron');
+  if (drw) drw.classList.toggle('open', CATALOG_OPEN);
+  if (btn) btn.classList.toggle('open', CATALOG_OPEN);
+  if (chv) chv.textContent = CATALOG_OPEN ? '▴' : '▾';
+  if (CATALOG_OPEN) {
+    renderCatalog();
+    const srch = document.getElementById('catalogSearchInput');
+    if (srch) srch.focus();
+  }
+}
+
+function setCatalogCat(cat) {
+  CATALOG_CAT = cat;
+  document.querySelectorAll('#catalogCats .cat-tab').forEach((el, idx) => {
+    const keys = ['all', 'potions', 'runes', 'gear'];
+    el.classList.toggle('active', keys[idx] === cat);
+  });
+  renderCatalog();
+}
+
+function _isEditingInside(el) {
+  const ae = document.activeElement;
+  return !!(el && ae && el.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA'));
+}
+
+function renderCatalog() {
+  const grid = document.getElementById('catalogGrid');
+  if (!grid || !STATE) return;
+  const q = (document.getElementById('catalogSearchInput')?.value || '').trim().toLowerCase();
+  const buy = (STATE.cfg && STATE.cfg.buy_items) || {};
+  const items = (STATE.known_items || []).filter(n => {
+    const [cat] = _itemMeta(n);
+    if (CATALOG_CAT !== 'all' && cat !== CATALOG_CAT) return false;
+    if (q && !n.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const catSig = JSON.stringify([CATALOG_CAT, q, items.map(n => [n, !!(buy[n] && buy[n].on)])]);
+  if (catSig === window._lastCatSig) return;
+  window._lastCatSig = catSig;
+  if (!items.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;padding:12px;text-align:center;color:var(--dim);font-size:12px">No catalog items match "${escHtml(q)}"</div>`;
+    return;
+  }
+  grid.innerHTML = items.map(n => {
+    const [, ico] = _itemMeta(n);
+    const added = !!(buy[n] && buy[n].on);
+    const esc = escJs(n);
+    return `
+      <button type="button" class="catalog-item ${added ? 'added' : ''}" onclick="toggleCatalogItem('${esc}')">
+        <span class="catalog-item-lbl">${_itemIconHtml(n, ico, 22)}<span class="catalog-item-name">${escHtml(n)}</span></span>
+        <span class="catalog-check">${added ? '✓' : '＋'}</span>
+      </button>`;
+  }).join('');
+}
+
+async function toggleCatalogItem(name) {
+  const buy = (STATE && STATE.cfg && STATE.cfg.buy_items) || {};
+  if (buy[name] && buy[name].on) {
+    await dropBuyItem(name);
+    showToast('Removed ' + name);
+  } else {
+    const res = await apiCall('add_buy_item', name);
+    if (res) STATE = res;
+    renderAll();
+    showToast('Added ' + name);
+  }
+}
+
+async function addBuyItem() {
+  const inp = document.getElementById('customItemInput');
+  const raw = inp.value.trim();
+  if (!raw) return;
+  const resolved = await apiCall('add_buy_item', raw);
+  inp.value = '';
+  if (resolved) STATE = resolved;
+  renderAll();
+}
+
+async function dropBuyItem(name) {
+  const buy = { ...(STATE.cfg.buy_items || {}) };
+  delete buy[name];
+  await saveField('buy_items', buy);
+}
+
+let _buyQtyTimers = {};
+function scheduleBuyQty(name, qty) {
+  if (!STATE || !STATE.cfg) return;
+  const buy = { ...(STATE.cfg.buy_items || {}) };
+  buy[name] = { on: true, qty: (qty || '').trim() };
+  STATE.cfg.buy_items = buy;
+  clearTimeout(_buyQtyTimers[name]);
+  _buyQtyTimers[name] = setTimeout(() => apiCall('update_cfg', { buy_items: STATE.cfg.buy_items }), 350);
+}
+
+async function updateBuyQty(name, qty) {
+  clearTimeout(_buyQtyTimers[name]);
+  const buy = { ...(STATE.cfg.buy_items || {}) };
+  buy[name] = { on: true, qty: (qty || '').trim() };
+  await saveField('buy_items', buy);
+}
+
+async function addPopBiome() {
+  const sel = document.getElementById('addPopBiomeSelect');
+  const b = sel.value;
+  if (!b) return;
+  const pop = { ...(STATE.cfg.pop_items || {}) };
+  if (!pop[b]) pop[b] = {};
+  await saveField('pop_items', pop);
+}
+
+async function dropPopBiome(b) {
+  const pop = { ...(STATE.cfg.pop_items || {}) };
+  delete pop[b];
+  await saveField('pop_items', pop);
+}
+
+async function addPopPotion(b, p) {
+  if (!p) return;
+  const pop = { ...(STATE.cfg.pop_items || {}) };
+  pop[b] = { ...(pop[b] || {}), [p]: (pop[b] && pop[b][p]) || '1' };
+  await saveField('pop_items', pop);
+}
+
+async function dropPopPotion(b, p) {
+  const pop = { ...(STATE.cfg.pop_items || {}) };
+  if (pop[b]) { delete pop[b][p]; }
+  await saveField('pop_items', pop);
+}
+
+async function setPopQty(b, p, qty) {
+  const val = Math.max(1, parseInt(qty || '1', 10) || 1);
+  const pop = { ...(STATE.cfg.pop_items || {}) };
+  if (!pop[b]) pop[b] = {};
+  pop[b][p] = String(val);
+  await saveField('pop_items', pop);
+}
+
+async function toggleRun() {
+  const res = await apiCall('toggle_run');
+  if (res && res.error) showToast(res.error);
+  await refreshState();
+}
+
+async function pickAvatarPhoto() {
+  const res = await apiCall('pick_avatar_photo');
+  if (res && res.ok) {
+    showToast('Updated avatar photo!');
+    await refreshState();
+  }
+}
+
+async function applyRobloxUsername() {
+  const inp = document.getElementById('inp-roblox_username');
+  const val = inp ? inp.value.trim() : '';
+  const nextState = await apiCall('sync_roblox_profile', val);
+  if (nextState) { STATE = nextState; renderAll(); }
+  showToast(val ? `Roblox username set to ${val}` : 'Using auto-detected Roblox username');
+}
+
+async function testWebhook() {
+  const whInp = document.getElementById('inp-webhook_url');
+  const srvInp = document.getElementById('inp-private_server');
+  const urlVal = whInp ? whInp.value : null;
+  const srvVal = srvInp ? srvInp.value : null;
+  showToast('Testing webhook connection...');
+  const res = await apiCall('test_webhook', urlVal, srvVal);
+  if (res && res.ok) {
+    showToast('Webhook verified! (No biome alert or server link sent)');
+    await refreshState();
+  } else {
+    showToast((res && res.error) || 'Failed to verify webhook');
+  }
+}
+
+function toggleWhVis() {
+  const inp = document.getElementById('inp-webhook_url');
+  const btn = document.getElementById('toggleWhBtn');
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = show ? 'Hide' : 'Show';
+}
+
+function toggleRareFilter() {
+  RARE_ONLY = !RARE_ONLY;
+  setSw('rareFilterSwitch', RARE_ONLY);
+  renderHistory();
+}
+
+async function toggleOnTop() {
+  ON_TOP = !ON_TOP;
+  setSw('topMostSwitch', ON_TOP);
+  await apiCall('set_on_top', ON_TOP);
+  showToast(ON_TOP ? 'Pinned Always On Top' : 'Always On Top turned off');
+}
+
+function openCalibrator(mode) { apiCall('open_calibrator', mode); }
+function setLogFilter(f) { LOG_FILTER = f; renderLogs(); }
+async function clearLogs() { await apiCall('clear_logs'); await refreshState(); }
+
+async function checkUpdatesNow() {
+  showToast('Checking for MMacro updates...');
+  const res = await apiCall('check_updates_now');
+  if (res) { STATE = res; renderAll(); }
+}
+
+async function previewRareFx(key) {
+  const res = await apiCall('preview_biome', key, 25, false);
+  if (res) {
+    STATE = res;
+    window._lastBiomeNow = '';
+    renderAll();
+    if (key !== 'NORMAL') triggerRareSpawnBanner(key, STATE.biome_pretty, STATE.biome_rate);
+  }
+}
+
+async function startSupportSession() {
+  const rel = (document.getElementById('inp-supportRelay')?.value || '').trim();
+  const allowIn = document.getElementById('sw-supportInput')?.classList.contains('on') || false;
+  const res = await apiCall('start_support', rel, allowIn);
+  if (res) { STATE = res; renderAll(); showToast('Support code generated! Share it with the developer.'); }
+}
+
+async function stopSupportSession() {
+  const res = await apiCall('stop_support');
+  if (res) { STATE = res; renderAll(); showToast('Support session disconnected.'); }
+}
+
+async function toggleSupportInput() {
+  const sw = document.getElementById('sw-supportInput');
+  const next = !(sw && sw.classList.contains('on'));
+  setSw('sw-supportInput', next);
+  if (STATE && STATE.support && STATE.support.active) {
+    const res = await apiCall('set_support_input', next);
+    if (res) { STATE = res; renderAll(); }
+  }
+}
+
+async function copySupportCode() {
+  const s = STATE && STATE.support;
+  if (!s || !s.code) return;
+  const txt = s.relay_url ? `${s.code} | Relay: ${s.relay_url}` : (s.lan_url ? `${s.code} (${s.lan_url})` : s.code);
+  try { await navigator.clipboard.writeText(txt); } catch (e) {}
+  showToast('Copied support code: ' + txt);
+}
+
+function renderSupportCard() {
+  const s = (STATE && STATE.support) || {};
+  const badge = document.getElementById('supportBadge');
+  const box = document.getElementById('supportCodeBox');
+  const copyBtn = document.getElementById('supportCopyBtn');
+  const startBtn = document.getElementById('supportStartBtn');
+  const stopBtn = document.getElementById('supportStopBtn');
+  const meta = document.getElementById('supportMetaLine');
+  if (!badge || !box) return;
+  if (s.active) {
+    box.textContent = s.code;
+    box.style.color = '#7dd3fc';
+    box.style.borderColor = 'rgba(56,189,248,0.65)';
+    copyBtn.style.display = 'inline-block';
+    startBtn.textContent = '↻ New Code';
+    stopBtn.style.display = 'inline-block';
+    setSw('sw-supportInput', !!s.allow_input);
+    if (s.connected_dev) {
+      badge.textContent = `● DEV: ${s.connected_dev}`;
+      badge.style.color = 'var(--good)';
+      meta.textContent = `🟢 Developer "${s.connected_dev}" is connected (expires in ${Math.ceil((s.expires_in||0)/60)}m). Click Disconnect Dev anytime.`;
+      meta.style.color = 'var(--good)';
+    } else {
+      badge.textContent = '● WAITING FOR DEV';
+      badge.style.color = 'var(--warn)';
+      meta.textContent = `Listening · Local/LAN: ${s.lan_url || s.local_url}${s.relay_url ? ' · Relay: ' + s.relay_url : ''} · Expires in ${Math.ceil((s.expires_in||0)/60)}m`;
+      meta.style.color = 'var(--subtext)';
+    }
+  } else {
+    box.textContent = '---- - ----';
+    box.style.color = 'var(--dim)';
+    box.style.borderColor = 'rgba(56,189,248,0.28)';
+    copyBtn.style.display = 'none';
+    startBtn.textContent = '🔑 Generate Code';
+    stopBtn.style.display = 'none';
+    badge.textContent = '● OFFLINE';
+    badge.style.color = 'var(--dim)';
+    meta.textContent = 'No active support session. Dev cannot view or control your macro without your code.';
+    meta.style.color = 'var(--dim)';
+  }
+}
+
+function renderHistory() {
+  const box = document.getElementById('dashHistList');
+  let items = (STATE.history || []).slice();
+  if (RARE_ONLY) items = items.filter(x => x.rare);
+  if (!items.length) items = [{ biome: STATE.biome_now, pretty: STATE.biome_pretty, time: '--:--:--', img: STATE.biome_img }];
+  box.innerHTML = items.slice(0, 3).map(h => `
+    <div class="hist-item">
+      <img src="${escHtml(h.img)}?v=${escHtml(STATE.cache_bust)}" alt="" />
+      <div class="hist-meta">
+        <div class="hist-top">
+          <span class="hist-biome">${escHtml(h.pretty)}</span>
+          <span class="hist-time">${escHtml(h.time)}</span>
+        </div>
+        <div class="hist-user">${escHtml(STATE.player_name)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function _formatLogLines(rows) {
+  return rows.map(l => `
+    <div class="log-line">
+      <span class="ts">${escHtml(l.ts)}</span>
+      <span class="tag ${escHtml(l.tag)}">[${escHtml(l.tag)}]</span>
+      <span>${escHtml(l.msg)}</span>
+    </div>
+  `).join('');
+}
+
+function renderLogs() {
+  const all = STATE.logs || [];
+  const box = document.getElementById('consoleBox');
+  const rows = all.filter(l => LOG_FILTER === 'all' || l.tag === LOG_FILTER);
+  if (!rows.length) {
+    box.innerHTML = `<div style="color:var(--dim)">No activity logged yet in this session. Press Start (F1) to begin.</div>`;
+  } else {
+    box.innerHTML = _formatLogLines(rows);
+    box.scrollTop = box.scrollHeight;
+  }
+  const dashBox = document.getElementById('dashConsoleBox');
+  if (dashBox) {
+    const recent = all.slice(-40);
+    dashBox.innerHTML = recent.length
+      ? _formatLogLines(recent)
+      : `<div style="color:var(--dim)">No activity logged yet in this session. Press Start (F1) to begin.</div>`;
+    dashBox.scrollTop = dashBox.scrollHeight;
+  }
+}
+
+function renderAll() {
+  if (!STATE) return;
+  const c = STATE.cfg;
+  document.documentElement.style.setProperty('--biome-rgb', STATE.biome_rgb);
+
+  // Per-biome spawn FX on rare biomes (GLITCHED / DREAMSPACE / CYBERSPACE)
+  const bKey = (STATE.biome_now || 'NORMAL').toUpperCase();
+  document.body.classList.toggle('rare-glitched', bKey === 'GLITCHED');
+  document.body.classList.toggle('rare-dreamspace', bKey === 'DREAMSPACE');
+  document.body.classList.toggle('rare-cyberspace', bKey === 'CYBERSPACE');
+  ensureGlitchBurstLoop(bKey === 'GLITCHED');
+  if (bKey === 'GLITCHED') {
+    if (window._glitchMsgKey !== 'GLITCHED') showGlitchMessages();
+  } else {
+    const msgStack = document.getElementById('glitchMsgStack');
+    if (msgStack) msgStack.classList.remove('show');
+    clearInterval(window._glitchMsgTicker);
+  }
+  window._glitchMsgKey = bKey;
+  const appFx = document.getElementById('appRareFx');
+  if (appFx && window._lastAppFxKey !== bKey) {
+    window._lastAppFxKey = bKey;
+    if (bKey === 'GLITCHED' || bKey === 'CYBERSPACE' || bKey === 'DREAMSPACE') {
+      const tokens = bKey === 'GLITCHED'
+        ? ['0xF9', '!@#', '░▒▓', 'ERR', '?%*', 'GL1TCH', '///']
+        : (bKey === 'CYBERSPACE'
+          ? ['10101', '01010', '11001', '00110', 'SYS', 'UNLOCK', '101']
+          : ['✦', '✧', '★', '⋆', '✦', '✧', '✵']);
+      const col = bKey === 'GLITCHED' ? 'rgba(74, 222, 128, 0.34)' : (bKey === 'CYBERSPACE' ? 'rgba(56, 189, 248, 0.34)' : 'rgba(255, 226, 252, 0.58)');
+      let html = '';
+      for (let i = 0; i < 16; i++) {
+        const left = ((i * 6.3 + (i % 3) * 1.7) % 96).toFixed(1);
+        const dur = (5.5 + (i % 5) * 1.4).toFixed(1);
+        const del = (-1 * (i * 0.9)).toFixed(1);
+        const sz = bKey === 'DREAMSPACE' ? (12 + (i % 4) * 4) : (10 + (i % 3) * 2);
+        html += `<span class="rare-particle" style="left:${left}%;color:${col};font-size:${sz}px;animation-duration:${dur}s;animation-delay:${del}s">${tokens[i % tokens.length]}</span>`;
+      }
+      if (bKey === 'GLITCHED') {
+        html += `<div class="glitch-tear-bar" id="appGlitchTear" style="top:28%"></div>`;
+      }
+      if (bKey === 'DREAMSPACE') html = buildDreamFxMarkup();
+      else if (bKey === 'CYBERSPACE') html = buildCyberFxMarkup();
+      appFx.innerHTML = html;
+    } else {
+      appFx.innerHTML = '';
+      const subEl = document.querySelector('.brand-sub');
+      if (subEl && STATE) subEl.textContent = `WEBVIEW HUD v${STATE.version || '1.1.4'}`;
+    }
+  }
+  const heroFx = document.getElementById('heroFxLayer');
+  if (heroFx) {
+    if (bKey === 'CYBERSPACE') {
+      heroFx.innerHTML = '<div style="position:absolute;inset:0;padding:12px;font-family:Consolas,monospace;font-size:11px;color:rgba(56,189,248,0.22);letter-spacing:3px;word-break:break-all;line-height:1.8">101010101 010101101 101010101 001101010 101010101 110100101</div>';
+    } else if (bKey === 'GLITCHED') {
+      heroFx.innerHTML = '<div style="position:absolute;inset:0;padding:12px;font-family:Consolas,monospace;font-size:11px;color:rgba(59,227,122,0.22);letter-spacing:3px;word-break:break-all;line-height:1.8">!@#$%^*░▒▓?/\\|~ !@#%&░▒▓ 0xF9A2 !@#$%^*░▒▓</div>';
+    } else if (heroFx.innerHTML) {
+      heroFx.innerHTML = '';
+    }
+  }
+  if (window._lastBiomeNow && window._lastBiomeNow !== bKey && (bKey === 'GLITCHED' || bKey === 'DREAMSPACE' || bKey === 'CYBERSPACE')) {
+    triggerRareSpawnBanner(bKey, STATE.biome_pretty, STATE.biome_rate);
+  }
+  window._lastBiomeNow = bKey;
+
+  // Header & Sidebar
+  document.getElementById('playerName').textContent = STATE.player_name;
+  document.getElementById('instPlayerName').textContent = STATE.player_name;
+  document.getElementById('statusText').textContent = STATE.running ? 'LIVE' : (STATE.phase || 'IDLE').toUpperCase();
+  document.getElementById('statusPill').classList.toggle('live', STATE.running);
+  document.getElementById('uptimeText').textContent = STATE.uptime;
+  document.getElementById('robloxPill').classList.toggle('linked', STATE.roblox_up);
+  document.getElementById('robloxText').textContent = STATE.roblox_up ? 'ROBLOX: LINKED' : 'ROBLOX: OFFLINE';
+
+  const sideBtn = document.getElementById('sidePowerBtn');
+  sideBtn.classList.toggle('running', STATE.running);
+  document.getElementById('sidePowerTxt').textContent = STATE.running ? 'STOP [F2]' : 'ENGAGE [F1]';
+
+  const mainBtn = document.getElementById('mainActionBtn');
+  mainBtn.classList.toggle('stop', STATE.running);
+  mainBtn.textContent = STATE.running ? '⏹ STOP MONITORING (F2)' : '▶ START MONITORING (F1)';
+
+  // Nav dots
+  document.getElementById('dot-macro').classList.toggle('on', !!(c.anti_afk || c.clip_on || c.equip_on || c.auto_reconnect));
+  document.getElementById('dot-fishing').classList.toggle('on', !!c.fish_on);
+  document.getElementById('dot-items').classList.toggle('on', !!(c.auto_items || c.rune_on || c.selector_on || c.pop_on));
+  document.getElementById('dot-merchant').classList.toggle('on', !!(c.merchant_on || c.collect_on || c.eden_on));
+
+  // Dashboard cards
+  const imgUrl = STATE.biome_img + '?v=' + STATE.cache_bust;
+  const avUrl = (STATE.avatar_url || '/avatar.png') + '?v=' + STATE.cache_bust;
+  const avImg = document.getElementById('instAvatarImg');
+  if (avImg && avImg.getAttribute('src') !== avUrl) avImg.src = avUrl;
+  document.getElementById('heroBgImg').src = imgUrl;
+  document.getElementById('heroEmblem').src = imgUrl;
+  document.getElementById('heroBiomeName').textContent = STATE.biome_pretty;
+  document.getElementById('heroBiomeRate').textContent = '◈ ' + STATE.biome_rate;
+  document.getElementById('instCount').textContent = STATE.roblox_up ? '1' : '0';
+  document.getElementById('raresCount').textContent = String(STATE.rares_count);
+  document.getElementById('activeInstBadge').textContent = `(${STATE.roblox_up ? 1 : 0})`;
+  document.getElementById('instBannerImg').src = imgUrl;
+  document.getElementById('instAura').textContent = '✦ ' + (STATE.aura_now || 'None Equipped');
+  document.getElementById('instBiomeTitle').textContent = STATE.biome_pretty;
+  document.getElementById('instBiomePillImg').src = imgUrl;
+  document.getElementById('instBiomePillTxt').textContent = STATE.biome_pretty;
+
+  const countsTotal = STATE.biome_counts_total ?? 0;
+  document.getElementById('biomeCountsBadge').textContent = `Synced · ${countsTotal.toLocaleString()} total`;
+  const countsList = STATE.biome_counts || [];
+  const countsSig = countsList.map(i => `${i.key}:${i.count}`).join('|');
+  if (countsSig !== window._lastCountsSig) {
+    window._lastCountsSig = countsSig;
+    document.getElementById('biomeCountsGrid').innerHTML = countsList.map(item => {
+      const k = (item.key || '').toUpperCase();
+      const extraCls = k === 'GLITCHED' ? ' rare-glitch-card' : (k === 'CYBERSPACE' ? ' rare-cyber-card' : (k === 'DREAMSPACE' ? ' rare-dream-card' : ''));
+      const fxOverlay = k === 'GLITCHED'
+        ? `<div class="glitch-noise-stream" id="glitchNoiseStream">!@#%░▒▓?&amp;*</div>`
+        : (k === 'CYBERSPACE'
+          ? `<div class="cyber-bin-stream"><span>101010101 · 010110101 · 101010101 · 010101010</span></div>`
+          : '');
+      const nameHtml = k === 'GLITCHED'
+        ? `<span class="glitch-title-fx" id="glitchTitleFx">${escHtml(item.name)}</span>`
+        : escHtml(item.name);
+      const rateHtml = k === 'CYBERSPACE'
+        ? `${escHtml(item.rate || 'Event Biome')}<div class="cyber-status-row"><span class="cyber-lock-icon" title="Lock / Unlock"><svg class="cyber-lock-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path class="cyber-lock-shackle" d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><span class="cyber-bin-tag" id="cyberLockBin">101010101</span></div>`
+        : escHtml(item.rate || 'Event Biome');
+      return `
+    <div class="count-pill${extraCls}" style="border-color:${item.color}33" title="${escHtml(item.name)}: ${item.count}">
+      ${fxOverlay}
+      <div class="count-left">
+        <img class="count-img" src="${escHtml(item.img || '/biomes/normal.png')}" alt="${escHtml(item.name)}" style="border:1.5px solid ${item.color}99;box-shadow:0 0 12px ${item.color}33" />
+        <div class="count-meta">
+          <div class="count-name">${nameHtml}</div>
+          <div class="count-rate">${rateHtml}</div>
+        </div>
+      </div>
+      <span class="count-val ${item.count ? '' : 'zero'}">${item.count.toLocaleString()}</span>
+    </div>`;
+    }).join('');
+  }
+
+  const whOk = (c.webhook_url || '').trim().startsWith('https://');
+  const whBadge = document.getElementById('whBadge');
+  whBadge.textContent = whOk ? '● ARMED' : '● NOT SET';
+  whBadge.style.color = whOk ? 'var(--good)' : 'var(--warn)';
+
+  // Matrix chips (click toggles directly!)
+  const chips = [
+    ['Anti-AFK', 'anti_afk', null],
+    ['Aura Clip', 'clip_on', null],
+    ['Auto Equip', 'equip_on', null],
+    ['Reconnect', 'auto_reconnect', null],
+    ['Auto SC/BR', 'auto_items', null],
+    ['Auto Pop', 'pop_on', null],
+    ['Fishing', 'fish_on', ['eden_on', 'Eden Detector']],
+    ['Merchants', 'merchant_on', null],
+    ['Eden Hunt', 'eden_on', ['fish_on', 'Auto Fishing']],
+  ];
+  document.getElementById('matrixGrid').innerHTML = chips.map(([lbl, key, excl]) => `
+    <div class="chip ${c[key] ? 'on' : ''}" onclick="${excl ? `toggleExclusive('${key}','${excl[0]}','${excl[1]}')` : `toggleCfg('${key}')`}">
+      <span class="chip-dot"></span><span>${lbl}</span>
+    </div>
+  `).join('');
+
+  renderHistory();
+
+  // Toggles & sub-panels
+  ['anti_afk','clip_on','clip_key_on','equip_on','auto_reconnect','rejoin_browser','low_end',
+   'fish_on','fish_vip','fish_sell_all','fish_full_check','auto_items','rune_on','selector_on',
+   'pop_on','merchant_on','collect_on','eden_on','eden_path','eden_record','auto_update'].forEach(k => setSw('sw-' + k, c[k]));
+  const updEl = document.getElementById('updateStatusText');
+  if (updEl && STATE.update_info) {
+    const ui = STATE.update_info;
+    updEl.textContent = ui.msg || `v${STATE.version || ''}`;
+    updEl.style.color = ui.state === 'error' ? '#fca5a5' : (ui.state === 'downloading' || ui.state === 'restarting' ? 'var(--accent)' : 'var(--good)');
+    if (ui.state !== window._lastUpdState && (ui.state === 'downloading' || ui.state === 'restarting')) {
+      showToast('⬇ ' + (ui.msg || 'Installing update...'));
+    }
+    window._lastUpdState = ui.state;
+  }
+  setSub('clip_on', c.clip_on);
+  setSub('equip_on', c.equip_on);
+  setSub('rune_on', c.rune_on);
+  setSub('selector_on', c.selector_on);
+  setSub('pop_on', c.pop_on);
+
+  ['clip_min','equip_aura','fish_sell','fish_sell_amount','rune_after','eden_ping','webhook_url','private_server','roblox_username'].forEach(k => {
+    const el = document.getElementById('inp-' + k);
+    if (el && document.activeElement !== el) el.value = c[k] ?? '';
+  });
+  document.getElementById('inp-fish_sell_amount').disabled = !!c.fish_sell_all;
+  document.getElementById('btn-clip_quality').textContent = c.clip_quality || '768p';
+  document.getElementById('btn-clip_keys').textContent = c.clip_keys || 'Win+Alt+G';
+
+  const rb = Array.isArray(c.rune_biomes) ? c.rune_biomes : [];
+  setSw('sw-rune-PUMPKIN MOON', rb.includes('PUMPKIN MOON'));
+  setSw('sw-rune-GRAVEYARD', rb.includes('GRAVEYARD'));
+
+  const cm = Array.isArray(c.collect_merchants) ? c.collect_merchants : [];
+  ['Jester','Mari','Rin'].forEach(n => setSw('sw-merch-' + n, cm.includes(n)));
+
+  // Dropdowns
+  const selDrive = document.getElementById('sel-selector_biome');
+  if (!selDrive.options.length && STATE.drives) {
+    Object.entries(STATE.drives).forEach(([k, v]) => selDrive.add(new Option(`${k} — ${v}`, k)));
+  }
+  selDrive.value = c.selector_biome || 'HEAVEN';
+
+  const popBiomeSel = document.getElementById('addPopBiomeSelect');
+  const popBiomeOpts = Object.keys(STATE.biomes || {}).filter(b => b !== 'NORMAL' && !(c.pop_items && c.pop_items[b]));
+  const popBiomeSig = popBiomeOpts.join('|');
+  if (document.activeElement !== popBiomeSel && popBiomeSig !== window._lastPopBiomeSig) {
+    window._lastPopBiomeSig = popBiomeSig;
+    popBiomeSel.innerHTML = '';
+    popBiomeOpts.forEach(b => popBiomeSel.add(new Option(STATE.biomes[b].pretty, b)));
+  }
+
+  // Auto Pop Groups (skip rebuild while editing inside or unchanged)
+  const popBox = document.getElementById('popListContainer');
+  const popSig = JSON.stringify(c.pop_items || {});
+  if (!_isEditingInside(popBox) && popSig !== window._lastPopSig) {
+    window._lastPopSig = popSig;
+    popBox.innerHTML = Object.entries(c.pop_items || {}).map(([b, pots]) => {
+      const eb = escJs(b);
+      return `
+    <div class="biome-group-box">
+      <div class="biome-group-hdr">
+        <span style="font-weight:600;font-size:13px">${escHtml((STATE.biomes[b] && STATE.biomes[b].pretty) || b)}</span>
+        <div style="display:flex;gap:6px">
+          <select class="input" onchange="if(this.value){addPopPotion('${eb}', this.value); this.value='';}">
+            <option value="">＋ Add Potion...</option>
+            ${(STATE.potions || []).filter(p => !(pots && pots[p])).map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('')}
+          </select>
+          <button class="btn-sm" onclick="dropPopBiome('${eb}')">✕</button>
+        </div>
+      </div>
+      <div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">
+        ${Object.entries(pots || {}).map(([p, q]) => {
+          const ep = escJs(p), hp = escHtml(p), eq = escHtml(q);
+          return `
+          <div class="item-pill-row">
+            <span class="item-pill-lbl" style="color:var(--accent);font-size:12.5px">${_itemIconHtml(p, '🧪', 20)}<span>${hp}</span></span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <button class="btn-sm" onclick="setPopQty('${eb}','${ep}', ${(parseInt(q,10)||1)-1})">−</button>
+              <input class="input center" style="width:54px" value="${eq}" onchange="setPopQty('${eb}','${ep}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();}" />
+              <button class="btn-sm" onclick="setPopQty('${eb}','${ep}', ${(parseInt(q,10)||1)+1})">+</button>
+              <button class="btn-sm" onclick="dropPopPotion('${eb}','${ep}')">✕</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+    }).join('');
+  }
+
+  // Known item catalog drawer + shopping list (skip rebuild while typing Qty or unchanged)
+  const catBtnTxt = document.getElementById('catalogBtnText');
+  if (catBtnTxt && STATE.known_items) catBtnTxt.textContent = `Browse Catalog (${STATE.known_items.length})`;
+  renderCatalog();
+  const buyEntries = Object.entries(c.buy_items || {}).filter(([, v]) => v && v.on);
+  document.getElementById('buyCountBadge').textContent = `${buyEntries.length} selected`;
+  const buyBox = document.getElementById('buyListContainer');
+  const buyKeysSig = buyEntries.map(([n]) => n).join('|');
+  if (buyKeysSig !== window._lastBuySig) {
+    window._lastBuySig = buyKeysSig;
+    buyBox.innerHTML = buyEntries.map(([n, v]) => {
+      const en = escJs(n);
+      const ep = escHtml(n);
+      const ev = escHtml(v.qty || '');
+      return `
+    <div class="item-pill-row" data-buy-item="${ep}">
+      <span class="item-pill-lbl" style="color:var(--accent);font-size:13px">${_itemIconHtml(n, _itemMeta(n)[1], 22)}<span>${ep}</span></span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--dim)">Qty:</span>
+        <input type="text" inputmode="numeric" class="input center buy-qty-inp" style="width:72px" placeholder="Max" value="${ev}" oninput="scheduleBuyQty('${en}', this.value)" onchange="updateBuyQty('${en}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();}" />
+        <button class="btn-sm" onclick="dropBuyItem('${en}')">✕</button>
+      </div>
+    </div>`;
+    }).join('');
+  } else {
+    buyBox.querySelectorAll('.item-pill-row').forEach(row => {
+      const name = row.getAttribute('data-buy-item');
+      const inp = row.querySelector('.buy-qty-inp');
+      if (inp && document.activeElement !== inp && c.buy_items && c.buy_items[name]) {
+        const want = String(c.buy_items[name].qty || '');
+        if (inp.value !== want) inp.value = want;
+      }
+    });
+  }
+
+  document.getElementById('testersLine').textContent = (STATE.testers || []).join('  ·  ');
+  renderSupportCard();
+  renderLogs();
+}
+
+async function refreshState() {
+  const s = await apiCall('get_state');
+  if (s) { STATE = s; renderAll(); }
+}
+
+function sigNoiseLine(len) {
+  const src = '0123456789abcdefx#@%&?/\\[]{}<>*!§░▒▓';
+  let out = '';
+  for (let i = 0; i < len; i++) {
+    out += Math.random() < 0.13 ? ' ' : src[Math.floor(Math.random() * src.length)];
+  }
+  return out;
+}
+
+const GLITCH_MSG_TITLES = ['« SERVER INFO »', '« S3RV3R INF0 »', '« SERV#R INF0 »', '« SERVER 1NF0 »', '« S3RV#R INF0 »'];
+
+function glitchWarnIcon() {
+  return '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5 45 42H3z"/><path d="M24 18v12"/><circle cx="24" cy="35" r="1.7"/></svg>';
+}
+
+function buildGlitchMsgRow() {
+  const row = document.createElement('div');
+  row.className = 'glitch-msg';
+  row.innerHTML = '<div class="gm-icon">' + glitchWarnIcon() + '</div>'
+    + '<div class="gm-body"><div class="gm-title">' + GLITCH_MSG_TITLES[Math.floor(Math.random() * GLITCH_MSG_TITLES.length)] + '</div>'
+    + '<div class="gm-line">' + sigNoiseLine(36) + '</div></div>'
+    + '<div class="gm-scan"></div>';
+  return row;
+}
+
+function showGlitchMessages() {
+  const stack = document.getElementById('glitchMsgStack');
+  if (!stack) return;
+  clearInterval(window._glitchMsgTicker);
+  clearTimeout(window._glitchMsgTimer);
+  stack.innerHTML = '';
+  for (let i = 0; i < 3; i++) stack.appendChild(buildGlitchMsgRow());
+  stack.classList.add('show');
+  window._glitchMsgTicker = setInterval(() => {
+    const titles = stack.querySelectorAll('.gm-title');
+    const lines = stack.querySelectorAll('.gm-line');
+    lines.forEach(el => { el.textContent = sigNoiseLine(36); });
+    if (titles.length && Math.random() < 0.5) {
+      const t = titles[Math.floor(Math.random() * titles.length)];
+      t.textContent = GLITCH_MSG_TITLES[Math.floor(Math.random() * GLITCH_MSG_TITLES.length)];
+    }
+  }, 180);
+  window._glitchMsgTimer = setTimeout(() => {
+    clearInterval(window._glitchMsgTicker);
+    stack.classList.remove('show');
+  }, 3000);
+}
+
+let _rareTimer = null;
+function triggerRareSpawnBanner(key, pretty, rate) {
+  const el = document.getElementById('rareSpawnBanner');
+  const icon = document.getElementById('rareBannerIcon');
+  const txt = document.getElementById('rareBannerText');
+  if (!el || !txt) return;
+  el.classList.remove('fx-glitched', 'fx-dreamspace', 'fx-cyberspace', 'show');
+  if (key === 'GLITCHED') {
+    showGlitchMessages();
+    return;
+  } else if (key === 'CYBERSPACE') {
+    el.classList.add('fx-cyberspace');
+    icon.textContent = '🔓';
+    txt.textContent = `101010101 · ${(pretty || 'Cyberspace').toUpperCase()} UNLOCKED (${rate || ''})`;
+  } else {
+    el.classList.add('fx-dreamspace');
+    icon.textContent = '✦';
+    txt.textContent = `${(pretty || 'Dreamspace').toUpperCase()} AWAKENED (${rate || ''})`;
+  }
+  void el.offsetWidth;
+  el.classList.add('show');
+  clearTimeout(_rareTimer);
+  _rareTimer = setTimeout(() => el.classList.remove('show'), 4500);
+}
+
+// Global Glitch UI effect + Biome Counts live card animations
+setInterval(() => {
+  if (document.body.classList.contains('glitch-burst')) return;
+  const glyphs = '!@#$%^&*<>?/\\|~░▒▓01';
+  if (document.body.classList.contains('rare-glitched')) {
+    const tear = document.getElementById('appGlitchTear');
+    if (tear) {
+      const show = Math.random() < 0.45;
+      tear.style.opacity = show ? '0.78' : '0';
+      if (show) {
+        tear.style.top = (8 + Math.random() * 84).toFixed(1) + '%';
+        tear.style.height = (2 + Math.floor(Math.random() * 7)) + 'px';
+      }
+    }
+    const subEl = document.querySelector('.brand-sub');
+    if (subEl) {
+      subEl.textContent = Math.random() < 0.35 ? `ERR://0x${Math.floor(Math.random()*999).toString(16).toUpperCase()} GL1TCH` : `GLITCHED // HUD v${(STATE && STATE.version) || '1.1.4'}`;
+    }
+  }
+  const page = document.getElementById('page-biomes');
+  if (!page || !page.classList.contains('active')) return;
+  const noiseEl = document.getElementById('glitchNoiseStream');
+  if (noiseEl) {
+    let s = '';
+    for (let i = 0; i < 12; i++) s += glyphs[Math.floor(Math.random() * glyphs.length)];
+    noiseEl.textContent = s;
+  }
+  const titleEl = document.getElementById('glitchTitleFx');
+  if (titleEl) {
+    if (Math.random() < 0.38) {
+      const base = 'Glitched'.split('');
+      const idx = Math.floor(Math.random() * base.length);
+      base[idx] = glyphs[Math.floor(Math.random() * 14)];
+      titleEl.textContent = base.join('');
+    } else {
+      titleEl.textContent = 'Glitched';
+    }
+  }
+  const binEl = document.getElementById('cyberLockBin');
+  if (binEl) {
+    binEl.textContent = Math.random() < 0.5 ? '101010101' : '010101010';
+  }
+}, 240);
+
+// Wiki-style GLITCHED corruption: briefly scramble every visible GUI label.
+const GLITCH_LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+const GLITCH_TEXT_GLYPHS = 'abcdefghijklmnopqrstuvwxyz0123456789#@%&!?<>/\\|█▓▒░';
+const GLITCH_SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'NOSCRIPT', 'SVG', 'PATH']);
+
+function glitchWord(length) {
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    const roll = Math.random();
+    if (i === 0 && roll < 0.30) out += 'x';
+    else if (i === 0 && roll < 0.38) out += GLITCH_LETTERS[Math.floor(Math.random() * 26)].toUpperCase();
+    else if (roll < 0.82) out += GLITCH_LETTERS[Math.floor(Math.random() * 26)];
+    else out += GLITCH_TEXT_GLYPHS[Math.floor(Math.random() * GLITCH_TEXT_GLYPHS.length)];
+  }
+  if (Math.random() < 0.18) out += Math.random() < 0.5 ? '.' : "'";
+  return out;
+}
+
+function glitchScrambleText(value) {
+  return value.split(/(\s+)/).map(part => {
+    if (!part || /^\s+$/.test(part)) return part;
+    if (/^[\d.,:%/xM]+$/i.test(part)) {
+      return Array.from(part).map(ch => {
+        if (/\d/.test(ch)) return Math.random() < 0.72 ? String(Math.floor(Math.random() * 10)) : GLITCH_TEXT_GLYPHS[Math.floor(Math.random() * GLITCH_TEXT_GLYPHS.length)];
+        if (/[.,]/.test(ch)) return Math.random() < 0.5 ? GLITCH_TEXT_GLYPHS[Math.floor(Math.random() * GLITCH_TEXT_GLYPHS.length)] : ch;
+        return Math.random() < 0.4 ? GLITCH_TEXT_GLYPHS[Math.floor(Math.random() * GLITCH_TEXT_GLYPHS.length)] : ch;
+      }).join('');
+    }
+    if (part.length <= 3) return glitchWord(Math.max(2, part.length));
+    if (part.length <= 7) return glitchWord(part.length - (Math.random() < 0.3 ? 1 : 0));
+    let out = '';
+    let used = 0;
+    const chunks = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < chunks && used < part.length; i++) {
+      const len = Math.min(2 + Math.floor(Math.random() * 3), part.length - used);
+      out += (i ? ' ' : '') + glitchWord(len);
+      used += len;
+    }
+    return out;
+  }).join('');
+}
+
+const GLITCH_STRIPES = [
+  ['#f8fafc', '#020617'],
+  ['#f8fafc', '#020617'],
+  ['#facc15', '#1c1917'],
+  ['#c084fc', '#0f172a'],
+  ['#38bdf8', '#020617'],
+  ['#4ade80', '#052e16'],
+  ['#f472b6', '#111827']
+];
+
+function randomizeGlitchStripe(el) {
+  const pair = GLITCH_STRIPES[Math.floor(Math.random() * GLITCH_STRIPES.length)];
+  el.style.setProperty('--g-light', pair[0]);
+  el.style.setProperty('--g-dark', pair[1]);
+  el.style.setProperty('--g-angle', (Math.random() < 0.5 ? 135 : 45) + 'deg');
+  el.style.setProperty('--g-size', (5 + Math.floor(Math.random() * 5)) + 'px');
+}
+
+function collectGlitchBurstTargets() {
+  const root = document.querySelector('.app-shell') || document.body;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent || !node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      if (GLITCH_SKIP_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+      if (parent.closest('[data-glitch-skip]') || parent.closest('#glitchCorruptOverlay')) return NodeFilter.FILTER_REJECT;
+      if (!parent.getClientRects().length) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const targets = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    targets.push({ node, original: node.nodeValue, last: node.nodeValue });
+  }
+  return targets;
+}
+
+function triggerGlitchBurst() {
+  if (window._glitchBurstActive) return;
+  const targets = collectGlitchBurstTargets();
+  if (!targets.length) return;
+
+  window._glitchBurstActive = true;
+  window._glitchBurstTargets = targets;
+  document.body.classList.add('glitch-burst');
+
+  const stripedHosts = Array.from(document.querySelectorAll('.count-pill, .hist-item, .biome-emblem-wrap, .avatar-ring, .biome-pill, .brand-crest'))
+    .filter(el => el.getClientRects().length);
+  for (const el of stripedHosts) {
+    el.classList.add('glitch-striped');
+    randomizeGlitchStripe(el);
+  }
+  window._glitchStripeHosts = stripedHosts;
+
+  const scrambleNow = () => {
+    for (const target of window._glitchBurstTargets || []) {
+      if (!target.node.parentNode) continue;
+      const keepReadable = Math.random() < 0.08;
+      target.last = keepReadable ? target.original : glitchScrambleText(target.original);
+      target.node.nodeValue = target.last;
+    }
+    for (const el of window._glitchStripeHosts || []) {
+      if (el.isConnected) randomizeGlitchStripe(el);
+    }
+  };
+  scrambleNow();
+  window._glitchBurstInterval = setInterval(scrambleNow, 75);
+  window._glitchBurstEndTimer = setTimeout(endGlitchBurst, 650 + Math.floor(Math.random() * 450));
+}
+
+function endGlitchBurst() {
+  clearInterval(window._glitchBurstInterval);
+  clearTimeout(window._glitchBurstEndTimer);
+  window._glitchBurstInterval = null;
+  window._glitchBurstEndTimer = null;
+  for (const target of window._glitchBurstTargets || []) {
+    if (target.node.parentNode && target.node.nodeValue === target.last) {
+      target.node.nodeValue = target.original;
+    }
+  }
+  window._glitchBurstTargets = [];
+  for (const el of window._glitchStripeHosts || []) {
+    el.classList.remove('glitch-striped');
+    el.style.removeProperty('--g-light');
+    el.style.removeProperty('--g-dark');
+    el.style.removeProperty('--g-angle');
+    el.style.removeProperty('--g-size');
+  }
+  window._glitchStripeHosts = [];
+  const overlay = document.getElementById('glitchCorruptOverlay');
+  if (overlay) overlay.remove();
+  window._glitchBurstOverlay = null;
+  document.body.classList.remove('glitch-burst');
+  window._glitchBurstActive = false;
+}
+
+function scheduleGlitchBurst(delay) {
+  clearTimeout(window._glitchBurstTimer);
+  window._glitchBurstTimer = setTimeout(() => {
+    window._glitchBurstTimer = null;
+    if (!window._glitchBurstLoopActive) return;
+    if (document.body.classList.contains('rare-glitched') && !document.hidden) triggerGlitchBurst();
+    scheduleGlitchBurst(3000 + Math.floor(Math.random() * 4000));
+  }, delay);
+}
+
+function ensureGlitchBurstLoop(enabled) {
+  if (enabled) {
+    if (window._glitchBurstLoopActive) return;
+    window._glitchBurstLoopActive = true;
+    scheduleGlitchBurst(700 + Math.floor(Math.random() * 700));
+  } else {
+    window._glitchBurstLoopActive = false;
+    clearTimeout(window._glitchBurstTimer);
+    window._glitchBurstTimer = null;
+    if (window._glitchBurstActive) endGlitchBurst();
+  }
+}
+
+// Cyberspace takeover: neon dome lattice, blue haze, floating data blocks.
+function cyberCubeSvg() {
+  const cubes = [
+    [86, 24, 14], [62, 26, 18], [34, 34, 20], [78, 48, 17], [50, 58, 22], [28, 70, 16]
+  ];
+  let s = '<svg viewBox="0 0 120 120" aria-hidden="true">';
+  cubes.forEach(([cx, cy, r]) => {
+    const h = r * 0.5;
+    s += '<g stroke="#cfeeff" stroke-width="1.4" stroke-linejoin="round">'
+      + `<polygon points="${cx},${cy - r} ${cx + r},${cy - h} ${cx},${cy} ${cx - r},${cy - h}" fill="rgba(147,197,253,0.92)"/>`
+      + `<polygon points="${cx - r},${cy - h} ${cx},${cy} ${cx},${cy + r} ${cx - r},${cy + h}" fill="rgba(37,99,235,0.82)"/>`
+      + `<polygon points="${cx + r},${cy - h} ${cx},${cy} ${cx},${cy + r} ${cx + r},${cy + h}" fill="rgba(29,78,216,0.74)"/>`
+      + '</g>';
+  });
+  return s + '</svg>';
+}
+
+function cyberDomeSvg() {
+  const rows = [
+    { y: -40, xs: [-120, 80, 280, 480, 680, 880, 1120] },
+    { y: 80, xs: [-20, 180, 380, 580, 780, 980] },
+    { y: 200, xs: [80, 280, 480, 680, 880] },
+    { y: 320, xs: [180, 380, 580, 780] }
+  ];
+  let lines = '';
+  rows.forEach((row, ri) => {
+    for (let i = 0; i < row.xs.length - 1; i++) {
+      lines += `<line x1="${row.xs[i]}" y1="${row.y}" x2="${row.xs[i + 1]}" y2="${row.y}"/>`;
+    }
+    if (ri < rows.length - 1) {
+      const next = rows[ri + 1];
+      row.xs.forEach(x => {
+        next.xs.forEach(nx => {
+          if (Math.abs(nx - x) <= 220) {
+            lines += `<line x1="${x}" y1="${row.y}" x2="${nx}" y2="${next.y}"/>`;
+          }
+        });
+      });
+    }
+  });
+  lines += '<line class="hz" x1="0" y1="352" x2="1000" y2="352"/>';
+  return '<svg viewBox="0 0 1000 560" preserveAspectRatio="none" aria-hidden="true">' + lines + '</svg>';
+}
+
+function buildCyberFxMarkup() {
+  let stars = '';
+  for (let i = 0; i < 22; i++) {
+    const left = ((i * 41 + 7) % 97).toFixed(1);
+    const top = (2 + (i * 29) % 46).toFixed(1);
+    const dur = (3 + (i % 5) * 0.6).toFixed(2);
+    const del = (-0.5 * (i % 8)).toFixed(2);
+    const sz = 2 + (i % 3);
+    stars += '<span class="cyber-star" style="left:' + left + '%;top:' + top + '%;width:' + sz
+      + 'px;height:' + sz + 'px;animation-duration:' + dur + 's;animation-delay:' + del + 's"></span>';
+  }
+  const blocks = cyberCubeSvg();
+  return '<div class="cyber-layer">'
+    + '<div class="cyber-haze"></div>'
+    + '<div class="cyber-dome">' + cyberDomeSvg() + '</div>'
+    + stars
+    + '<div class="cyber-streak cyber-streak-a"></div>'
+    + '<div class="cyber-streak cyber-streak-b"></div>'
+    + '<div class="cyber-streak cyber-streak-c"></div>'
+    + '<div class="cyber-float cyber-blocks-a">' + blocks + '</div>'
+    + '<div class="cyber-float cyber-blocks-b">' + blocks + '</div>'
+    + '<div class="cyber-float cyber-blocks-c">' + blocks + '</div>'
+    + '<div class="cyber-vignette"></div>'
+    + '</div>';
+}
+
+// Dreamspace takeover: hot magenta dream sky, blown-out white furniture, light rays.
+function buildDreamFxMarkup() {
+  const lamp = '<svg viewBox="0 0 60 200" aria-hidden="true">'
+    + '<rect x="27" y="16" width="6" height="176" rx="3"/>'
+    + '<rect x="10" y="184" width="40" height="9" rx="4"/>'
+    + '<rect x="14" y="0" width="32" height="20" rx="6"/>'
+    + '<rect x="20" y="20" width="20" height="6" rx="3"/>'
+    + '</svg>';
+  const table = '<svg viewBox="0 0 164 104" aria-hidden="true">'
+    + '<rect x="4" y="6" width="156" height="15" rx="4"/>'
+    + '<rect x="10" y="20" width="12" height="78" rx="4"/>'
+    + '<rect x="142" y="20" width="12" height="78" rx="4"/>'
+    + '<rect x="34" y="20" width="9" height="64" rx="3"/>'
+    + '<rect x="121" y="20" width="9" height="64" rx="3"/>'
+    + '</svg>';
+  const chair = '<svg viewBox="0 0 108 128" aria-hidden="true">'
+    + '<rect x="12" y="2" width="84" height="11" rx="4"/>'
+    + '<rect x="16" y="12" width="10" height="52" rx="3"/>'
+    + '<rect x="38" y="12" width="8" height="46" rx="3"/>'
+    + '<rect x="58" y="12" width="8" height="46" rx="3"/>'
+    + '<rect x="80" y="12" width="10" height="52" rx="3"/>'
+    + '<rect x="8" y="56" width="92" height="13" rx="4"/>'
+    + '<rect x="14" y="68" width="11" height="54" rx="4"/>'
+    + '<rect x="82" y="68" width="11" height="54" rx="4"/>'
+    + '<rect x="20" y="56" width="9" height="48" rx="3" opacity="0.85"/>'
+    + '<rect x="76" y="56" width="9" height="48" rx="3" opacity="0.85"/>'
+    + '</svg>';
+  const door = '<svg viewBox="0 0 104 168" aria-hidden="true">'
+    + '<rect x="2" y="2" width="100" height="164" rx="5"/>'
+    + '<rect x="10" y="10" width="37" height="70" rx="3" fill="#ffd9fb" opacity="0.9"/>'
+    + '<rect x="55" y="10" width="37" height="70" rx="3" fill="#ffd9fb" opacity="0.9"/>'
+    + '<rect x="10" y="90" width="37" height="66" rx="3" fill="#ffd9fb" opacity="0.9"/>'
+    + '<rect x="55" y="90" width="37" height="66" rx="3" fill="#ffd9fb" opacity="0.9"/>'
+    + '<circle cx="88" cy="86" r="3"/>'
+    + '</svg>';
+  const bed = '<svg viewBox="0 0 156 104" aria-hidden="true">'
+    + '<rect x="4" y="4" width="13" height="74" rx="4"/>'
+    + '<rect x="14" y="22" width="36" height="20" rx="6" fill="#ffd9fb" opacity="0.9"/>'
+    + '<rect x="14" y="40" width="138" height="26" rx="6"/>'
+    + '<rect x="52" y="40" width="100" height="26" rx="6" fill="#fff" opacity="0.5"/>'
+    + '<rect x="14" y="66" width="138" height="10" rx="3"/>'
+    + '<rect x="20" y="76" width="10" height="26" rx="3"/>'
+    + '<rect x="136" y="76" width="10" height="26" rx="3"/>'
+    + '</svg>';
+  const obj = (cls, svg) => '<div class="dream-float ' + cls + '"><span class="df-glow"></span>' + svg + '</div>';
+  return '<div class="dream-layer">'
+    + '<div class="dream-tint"></div>'
+    + '<div class="dream-cloud dream-cloud-a"></div>'
+    + '<div class="dream-cloud dream-cloud-b"></div>'
+    + '<div class="dream-cloud dream-cloud-c"></div>'
+    + '<div class="dream-horizon"></div>'
+    + '<div class="dream-fog dream-fog-a"></div>'
+    + '<div class="dream-fog dream-fog-b"></div>'
+    + '<div class="dream-ray dream-ray-a"></div>'
+    + '<div class="dream-ray dream-ray-b"></div>'
+    + '<div class="dream-ray dream-ray-c"></div>'
+    + '<div class="dream-ray dream-ray-d"></div>'
+    + '<div class="dream-vignette"></div>'
+    + obj('dream-lamp', lamp)
+    + obj('dream-table', table)
+    + obj('dream-chair', chair)
+    + obj('dream-door', door)
+    + obj('dream-bed', bed)
+    + '</div>';
+}
+
+window.addEventListener('pywebviewready', async () => {
+  await refreshState();
+  if (STATE && STATE.cfg && !STATE.cfg.tutorial_seen) {
+    openTutorial(0);
+  }
+  setInterval(refreshState, 1000);
+});
+</script>
+
+<script>
+(function () {
+  function run() {
+    document.body.classList.add('rare-cyberspace');
+    var fx = document.getElementById('appRareFx');
+    if (fx) fx.innerHTML = buildCyberFxMarkup();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+})();
+</script>
+
+</body>
+</html>
