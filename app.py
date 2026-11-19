@@ -788,7 +788,6 @@ def resolve_avatar_file(uid=''):
     candidates.extend([
         os.path.join(game.APP_DIR, 'avatar.png'),
         os.path.join(HERE_DIR, 'ui', 'brand_logo.png'),
-        os.path.join(HERE_DIR, 'axolotl.png'),
     ])
     for p in candidates:
         if p and os.path.isfile(p):
