@@ -252,7 +252,7 @@ BIOMES_DIR = os.path.join(HERE_DIR, 'biomes')
 os.makedirs(BIOMES_DIR, exist_ok=True)
 
 TITLE = 'Veyra'
-VERSION = '1.0.1'
+VERSION = '1.0.2'
 
 
 def dark_message(title, message):
@@ -1607,40 +1607,44 @@ class MacroEngine:
             if not enabled:
                 presence.set_activity(None)
                 return
+            veyra_icon = '<:veyra:1573481172191944795>'
             if not self.running:
                 presence.set_activity({
-                    'details': 'Veyra',
-                    'state': 'Idle',
-                    'buttons': [{'label': '🌐 Download Veyra', 'url': RELEASE_PAGE}],
+                    'details': '%s Veyra Macro\nMode: Idle' % veyra_icon,
+                    'state': 'Status: Ready\nPress Start in the app to begin\nDownload: Veyra Macro',
+                    'buttons': [{'label': '🌌 Download Veyra Macro', 'url': RELEASE_PAGE}],
                     'assets': {
                         'large_image': 'macro_logo',
-                        'large_text': 'Veyra',
+                        'large_text': 'Veyra Macro',
                         'small_image': 'macro_logo',
                         'small_text': 'Idle',
                     },
                 })
                 return
             biome = base_biome(self.biome_now or 'NORMAL') or 'NORMAL'
-            label = 'Biome "%s"' % (pretty(biome) or 'Normal')
             aura = self.aura_logged[0] if self.aura_logged and self.aura_logged[0] not in (None, '', '_None_') else ''
-            state = '%s · %s' % (self.presence_mode(), 'Paused' if self.paused else 'Running')
             slug = biome_slug(biome) or 'normal'
             if slug == 'sand_storm':
                 slug = 'sandstorm'
+            details = '%s Veyra Macro\nMode: %s\nBiome: %s' % (
+                veyra_icon, self.presence_mode(), pretty(biome) or 'Normal')
+            state_lines = []
             if aura:
-                state = 'Aura equipped "%s"\n%s' % (aura, state)
+                state_lines.append('Aura: %s' % aura)
+            state_lines.append('Server: %d/%d players' % (
+                self.cfg_int('server_players', 1, 1), self.cfg_int('server_slots', 20, 1)))
+            state_lines.append('Status: %s' % ('Paused' if self.paused else 'Running'))
+            state_lines.append('Download: Veyra Macro')
             presence.set_activity({
-                'details': label,
-                'state': state,
+                'details': details,
+                'state': '\n'.join(state_lines),
                 'timestamps': {'start': int(self.run_wall or time.time())},
-                'party': {'id': 'veyra-private-server',
-                          'size': [self.cfg_int('server_players', 1, 1), self.cfg_int('server_slots', 20, 1)]},
-                'buttons': [{'label': '🌐 Download Veyra', 'url': RELEASE_PAGE}],
+                'buttons': [{'label': '🌌 Download Veyra Macro', 'url': RELEASE_PAGE}],
                 'assets': {
                     'large_image': slug,
-                    'large_text': label,
+                    'large_text': 'Biome: %s' % (pretty(biome) or 'Normal'),
                     'small_image': 'macro_logo',
-                    'small_text': ('Equipped "%s"' % aura) if aura else 'Veyra',
+                    'small_text': ('Aura: %s' % aura) if aura else 'Veyra Macro',
                 },
             })
         except Exception as e:
