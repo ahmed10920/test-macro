@@ -2135,7 +2135,7 @@
               <div class="switch" id="sw-auto_items" onclick="toggleCfg('auto_items')"></div>
             </div>
             <div class="row">
-              <div class="row-info"><div class="row-lbl">Auto Cursed Rune Fragment</div><div class="row-hint">Uses a Cursed Rune Fragment after a chosen event biome runs for N seconds</div></div>
+              <div class="row-info"><div class="row-lbl">Auto Rune Pop</div><div class="row-hint">Uses a Cursed Rune Fragment after a chosen event biome runs for N seconds</div></div>
               <div class="switch" id="sw-rune_on" onclick="toggleCfg('rune_on')"></div>
             </div>
             <div class="sub-panel" id="sub-rune_on">
@@ -2266,17 +2266,15 @@
         <section class="page" id="page-event">
           <div class="card">
             <div class="card-hdr">
-              <div><div class="card-title">Auto Rune Pop</div><div class="card-sub">Use a Cursed Rune Fragment as soon as one of your event biomes starts</div></div>
+              <div><div class="card-title">Cursed Rune</div><div class="card-sub">Cursed Rune Fragment — used automatically on your event biomes</div></div>
               <span class="badge">EVENT</span>
             </div>
-            <div class="row">
-              <div class="row-info"><div class="row-lbl">Auto Rune Pop</div><div class="row-hint">Watches for your selected event biomes and pops a rune automatically when one arrives</div></div>
-              <div class="switch" id="sw-rune_on_event" onclick="toggleCfg('rune_on')"></div>
-            </div>
-            <div class="sub-panel" id="sub-rune_on_event">
-              <div class="row">
-                <div class="row-info"><div class="row-lbl">Rune Delay</div><div class="row-hint">Seconds to wait after the biome starts</div></div>
-                <input class="input" id="inp-rune_after_event" style="width:100px" type="number" min="0" onchange="saveField('rune_after', this.value)" />
+            <div style="padding:16px 20px;display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+              <img src="/ui/items/rune_icon.png" style="width:104px;height:104px;border-radius:14px" alt="Cursed Rune" />
+              <div style="flex:1;min-width:240px">
+                <div class="row-lbl">Cursed Rune Fragment</div>
+                <div class="row-hint">When <b>Auto Rune Pop</b> is enabled in Items &amp; Potions, Veyra uses a Cursed Rune Fragment as soon as one of your selected event biomes starts. Choose the biomes and the delay there.</div>
+                <button class="btn-sm" style="margin-top:12px" onclick="switchTab('items')">Open Items &amp; Potions →</button>
               </div>
             </div>
           </div>
@@ -3488,10 +3486,6 @@ function renderAll() {
   ['anti_afk','yield_pc','clip_on','clip_key_on','equip_on','auto_reconnect','rejoin_browser','fx_on',
    'fish_on','fish_vip','fish_sell_all','fish_full_check','auto_items','rune_on','selector_on',
    'pop_on','merchant_on','collect_on','eden_on','eden_path','eden_record','auto_update','discord_rpc'].forEach(k => setSw('sw-' + k, c[k]));
-   setSw('sw-rune_on_event', c.rune_on);
-   setSub('rune_on_event', c.rune_on);
-   const runeAfterInput = document.getElementById('inp-rune_after_event');
-   if (runeAfterInput && document.activeElement !== runeAfterInput) runeAfterInput.value = c.rune_after ?? 0;
   applyTheme(c.theme || 'dark');
   const discordSt = STATE.discord_status || {};
   const discordStatusEl = document.getElementById('discordRpcStatus');
