@@ -197,12 +197,8 @@ def ensure_dependencies(prompt_fn=None):
             except OSError:
                 pass
     except Exception as e:
-        ctypes.windll.user32.MessageBoxW(
-            0,
-            'Automatic installation failed:\n\n%s\n\nPlease check your internet connection or install manually.' % e,
-            'Veyra - Setup Failed',
-            0x10,
-        )
+        dark_message('Veyra - Setup Failed',
+                     'Automatic installation failed:\n\n%s\n\nPlease check your internet connection or install manually.' % e)
         return False
     return True
 
@@ -236,14 +232,13 @@ except Exception as e:          # numpy's DLLs raise OSError, not ImportError
             f.write('%s\n\nexe: %s\n' % (e, sys.executable))
     except OSError:
         pass
-    ctypes.windll.user32.MessageBoxW(0, 'The macro could not load one of its own files.\n\n%s\n\n'
-                                     'Most often an antivirus removed it, or the PC is out of memory:\n'
-                                     '  - add the macro to your antivirus exclusions and download it again\n'
-                                     '  - close other programs, then open it again\n%s\n'
-                                     'Send this message to Manas if it keeps happening.'
-                                     % (why, '  - on Windows N or KN, install the Media Feature Pack (Settings > Apps '
-                                        '> Optional features)\n' if 'DLL load failed' in why else ''),
-                                     'Veyra', 0x10)
+    dark_message('Veyra', 'The macro could not load one of its own files.\n\n%s\n\n'
+                 'Most often an antivirus removed it, or the PC is out of memory:\n'
+                 '  - add the macro to your antivirus exclusions and download it again\n'
+                 '  - close other programs, then open it again\n%s\n'
+                 'Send this message to Manas if it keeps happening.'
+                 % (why, '  - on Windows N or KN, install the Media Feature Pack (Settings > Apps '
+                    '> Optional features)\n' if 'DLL load failed' in why else ''))
     sys.exit(1)
 
 TEXT = '#f1f5f9'
@@ -258,6 +253,37 @@ os.makedirs(BIOMES_DIR, exist_ok=True)
 
 TITLE = 'Veyra'
 VERSION = '1.0.1'
+
+
+def dark_message(title, message):
+    """Dark-themed message box — Windows MessageBoxW ignores the app theme."""
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()
+        win = tk.Toplevel(root)
+        win.title(title)
+        win.configure(bg='#0b0d12')
+        win.resizable(False, False)
+        win.attributes('-topmost', True)
+        w, h = 440, 180
+        x = (win.winfo_screenwidth() - w) // 2
+        y = (win.winfo_screenheight() - h) // 2
+        win.geometry('%dx%d+%d+%d' % (w, h, x, y))
+        tk.Label(win, text=message, bg='#0b0d12', fg='#ffffff', wraplength=390,
+                 justify='left', font=('Segoe UI', 10)).pack(padx=22, pady=22, expand=True)
+        btn = tk.Button(win, text='OK', width=10, bg='#1e293b', fg='#ffffff',
+                        activebackground='#334155', activeforeground='#ffffff',
+                        relief='flat', command=win.destroy)
+        btn.pack(pady=(0, 18))
+        win.transient(root)
+        win.grab_set()
+        btn.focus_set()
+        win.bind('<Return>', lambda _e: win.destroy())
+        win.wait_window()
+        root.destroy()
+    except Exception:
+        ctypes.windll.user32.MessageBoxW(0, message, title, 0x40)
 REPO_SLUG = os.environ.get('MMACRO_REPO') or 'ahmed10920/veyra-macro'
 RELEASE_PAGE = f'https://github.com/{REPO_SLUG}/releases'
 RELEASES = os.environ.get('MMACRO_UPDATE_URL') or f'https://api.github.com/repos/{REPO_SLUG}/releases?per_page=5'
@@ -4406,7 +4432,7 @@ def main():
     if why:
         if why == 'Veyra is already open.' and _focus_existing_mmacro():
             sys.exit(0)
-        ctypes.windll.user32.MessageBoxW(0, why, TITLE, 0x40)
+        dark_message(TITLE, why)
         sys.exit(0)
     threading.Thread(target=_clear_old_unpacks, daemon=True).start()
 
@@ -4448,13 +4474,8 @@ def main():
         try:
             webview.start(debug=False)
         except Exception as e2:
-            ctypes.windll.user32.MessageBoxW(
-                0,
-                f'Veyra could not open its WebView window.\n\n{e2}\n\n'
-                'Make sure Microsoft Edge WebView2 Runtime is installed and .NET Framework 4.8 is enabled.',
-                TITLE,
-                0x10,
-            )
+            dark_message(TITLE, f'Veyra could not open its WebView window.\n\n{e2}\n\n'
+                         'Make sure Microsoft Edge WebView2 Runtime is installed and .NET Framework 4.8 is enabled.')
             sys.exit(1)
 
 
