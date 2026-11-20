@@ -1607,10 +1607,9 @@ class MacroEngine:
             if not enabled:
                 presence.set_activity(None)
                 return
-            veyra_icon = '<:veyra:1573481172191944795>'
             if not self.running:
                 presence.set_activity({
-                    'details': '%s Veyra Macro\nMode: Idle' % veyra_icon,
+                    'details': 'Veyra Macro\nMode: Idle',
                     'state': 'Status: Ready\nPress Start in the app to begin\nDownload: Veyra Macro',
                     'buttons': [{'label': '🌌 Download Veyra Macro', 'url': RELEASE_PAGE}],
                     'assets': {
@@ -1626,8 +1625,8 @@ class MacroEngine:
             slug = biome_slug(biome) or 'normal'
             if slug == 'sand_storm':
                 slug = 'sandstorm'
-            details = '%s Veyra Macro\nMode: %s\nBiome: %s' % (
-                veyra_icon, self.presence_mode(), pretty(biome) or 'Normal')
+            details = 'Veyra Macro\nMode: %s\nBiome: %s' % (
+                self.presence_mode(), pretty(biome) or 'Normal')
             state_lines = []
             if aura:
                 state_lines.append('Aura: %s' % aura)
