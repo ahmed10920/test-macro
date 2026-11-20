@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('ui', 'ui'), ('biomes', 'biomes'), ('eden.png', '.'), ('contract.png', '.'), ('auras.json', '.'), ('gui_points.json', '.'), ('veyra.db', '.'), ('icon.ico', '.'), ('veyra.ico', '.'), ('veyra-down.ico', '.'), ('veyra-draw.ico', '.'), ('veyra-hole.ico', '.'), ('sblackhole.ico', '.')]
+datas = [('ui', 'ui'), ('biomes', 'biomes'), ('eden.png', '.'), ('contract.png', '.'), ('auras.json', '.'), ('gui_points.json', '.'), ('veyra.db', '.'), ('icon.ico', '.'), ('veyra-hole.ico', '.'), ('sblackhole.ico', '.')]
 binaries = []
 hiddenimports = ['clr', 'clr_loader']
 tmp_ret = collect_all('rapidocr_onnxruntime')

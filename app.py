@@ -660,7 +660,7 @@ _logo = []
 def logo_png():
     if not _logo:
         try:
-            with open(os.path.join(HERE_DIR, 'ui', 'brand_logo.png'), 'rb') as f:
+            with open(os.path.join(HERE_DIR, 'ui', 'brand_bh.png'), 'rb') as f:
                 _logo.append(f.read())
         except OSError:
             _logo.append(None)
@@ -681,11 +681,10 @@ def post_event(webhook_url, title, description='', colour=EMBED_INFO, area='Macr
     if not webhook_url:
         return
     radar = area == 'Merchant' or bool(merchant)
-    embed = {'title': title[:256], 'color': colour, 'timestamp': _timestamp()}
-    if not radar:
-        embed['author'] = {'name': 'Veyra · %s' % area, 'url': RELEASE_PAGE}
+    embed = {'author': {'name': 'Veyra · %s' % area, 'url': RELEASE_PAGE},
+             'title': title[:256], 'color': colour, 'timestamp': _timestamp()}
     files = {}
-    if not radar and logo_png():
+    if logo_png():
         files['logo.png'] = logo_png()
         embed['author']['icon_url'] = 'attachment://logo.png'
     if radar:
@@ -693,15 +692,15 @@ def post_event(webhook_url, title, description='', colour=EMBED_INFO, area='Macr
     if description:
         embed['description'] = description[:4000]
     if footer:
-        if radar:
-            fields = list(fields) + [('​', '-# Veyra Merchant Radar · [%s](%s)' % (FOOTER, RELEASE_PAGE), False)]
-        else:
-            fields = list(fields) + [('​', '-# [%s](%s)' % (FOOTER, RELEASE_PAGE), False)]
+        fields = list(fields) + [(' ', '-# Veyra · v%s · [%s](%s)' % (VERSION, FOOTER, RELEASE_PAGE), False)]
     if fields:
         embed['fields'] = [{'name': n, 'value': str(v)[:1024] or '-', 'inline': i} for n, v, i in fields]
     if thumb:
         files['biome.png'] = thumb
         embed['thumbnail'] = {'url': 'attachment://biome.png'}
+    elif not radar and logo_png():
+        files['brandthumb.png'] = logo_png()
+        embed['thumbnail'] = {'url': 'attachment://brandthumb.png'}
     elif radar:
         icon = merchant_icon(merchant or '')
         if icon:
@@ -784,14 +783,18 @@ def post_merchant(webhook_url, name, server='', watch=None, collect=False, how='
               ('Route', 'Teleport → Shop → Buy' if collect else 'Alert only', True),
               ('Private Server', server_field(server), False)]
     embed = {
+        'author': {'name': 'Veyra · Merchant Radar', 'url': RELEASE_PAGE},
         'title': title,
         'description': description[:4000],
         'color': colour,
         'fields': [{'name': n, 'value': str(v)[:1024] or '-', 'inline': i} for n, v, i in fields],
-        'footer': {'text': 'Veyra Merchant Radar  •  Release v%s' % VERSION},
+        'footer': {'text': 'Veyra · v%s · %s' % (VERSION, FOOTER)},
         'timestamp': _timestamp(),
     }
     files = {}
+    if logo_png():
+        files['logo.png'] = logo_png()
+        embed['author']['icon_url'] = 'attachment://logo.png'
     icon = merchant_icon(name)
     if icon:
         files['merchant.png'] = icon
@@ -826,13 +829,17 @@ def post_alert(webhook_url, title, detail, colour, area, icon, emoji=''):
     if not webhook_url:
         return
     embed = {
+        'author': {'name': 'Veyra · %s' % area, 'url': RELEASE_PAGE},
         'title': ('%s %s' % (emoji, title)) if emoji else title,
         'description': detail or '-',
         'color': colour,
-        'footer': {'text': 'Veyra · %s' % area},
+        'footer': {'text': 'Veyra · v%s · %s' % (VERSION, FOOTER)},
         'timestamp': _timestamp(),
     }
     files = {}
+    if logo_png():
+        files['logo.png'] = logo_png()
+        embed['author']['icon_url'] = 'attachment://logo.png'
     blob = asset_png(icon)
     if blob:
         files['alert.png'] = blob
@@ -860,7 +867,7 @@ def post_status(webhook_url, title, detail='', colour=EMBED_INFO, area='Macro', 
         'title': '%s %s' % (_STATUS_ICONS.get(title, '🔔'), title),
         'description': '\n'.join(lines)[:4000],
         'color': colour,
-        'footer': {'text': 'Veyra | Release v%s' % VERSION},
+        'footer': {'text': 'Veyra · v%s · %s' % (VERSION, FOOTER)},
         'timestamp': _timestamp(),
     }
     files = {}
@@ -1578,9 +1585,9 @@ class MacroEngine:
                     'state': 'Idle',
                     'buttons': [{'label': '🌐 Download Veyra', 'url': RELEASE_PAGE}],
                     'assets': {
-                        'large_image': 'veyra',
+                        'large_image': 'brand_bh',
                         'large_text': 'Veyra',
-                        'small_image': 'veyra',
+                        'small_image': 'brand_bh',
                         'small_text': 'Idle',
                     },
                 })
@@ -1604,7 +1611,7 @@ class MacroEngine:
                 'assets': {
                     'large_image': slug,
                     'large_text': label,
-                    'small_image': 'veyra',
+                    'small_image': 'brand_bh',
                     'small_text': ('Equipped "%s"' % aura) if aura else 'Veyra',
                 },
             })
