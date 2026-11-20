@@ -718,7 +718,7 @@ def post_event(webhook_url, title, description='', colour=EMBED_INFO, area='Macr
     if description:
         embed['description'] = description[:4000]
     if footer:
-        fields = list(fields) + [(' ', '-# Veyra · v%s · [%s](%s)' % (VERSION, FOOTER, RELEASE_PAGE), False)]
+        fields = list(fields) + [(' ', '-# Veyra · v%s' % VERSION, False)]
     if fields:
         embed['fields'] = [{'name': n, 'value': str(v)[:1024] or '-', 'inline': i} for n, v, i in fields]
     if thumb:
@@ -814,7 +814,7 @@ def post_merchant(webhook_url, name, server='', watch=None, collect=False, how='
         'description': description[:4000],
         'color': colour,
         'fields': [{'name': n, 'value': str(v)[:1024] or '-', 'inline': i} for n, v, i in fields],
-        'footer': {'text': 'Veyra · v%s · %s' % (VERSION, FOOTER)},
+        'footer': {'text': 'Veyra · v%s' % VERSION},
         'timestamp': _timestamp(),
     }
     files = {}
@@ -859,7 +859,7 @@ def post_alert(webhook_url, title, detail, colour, area, icon, emoji=''):
         'title': ('%s %s' % (emoji, title)) if emoji else title,
         'description': detail or '-',
         'color': colour,
-        'footer': {'text': 'Veyra · v%s · %s' % (VERSION, FOOTER)},
+        'footer': {'text': 'Veyra · v%s' % VERSION},
         'timestamp': _timestamp(),
     }
     files = {}
@@ -893,7 +893,7 @@ def post_status(webhook_url, title, detail='', colour=EMBED_INFO, area='Macro', 
         'title': '%s %s' % (_STATUS_ICONS.get(title, '🔔'), title),
         'description': '\n'.join(lines)[:4000],
         'color': colour,
-        'footer': {'text': 'Veyra · v%s · %s' % (VERSION, FOOTER)},
+        'footer': {'text': 'Veyra · v%s' % VERSION},
         'timestamp': _timestamp(),
     }
     files = {}
