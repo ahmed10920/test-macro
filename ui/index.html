@@ -316,6 +316,16 @@
   }
   .status-pill.paused .pulse-dot { background: var(--warn); box-shadow: 0 0 10px var(--warn); }
   @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: 0.6; } }
+  .mode-chips { display: inline-flex; align-items: center; gap: 6px; }
+  .mode-chip {
+    padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 700;
+    letter-spacing: .03em; color: var(--dim); background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.09); white-space: nowrap;
+  }
+  .mode-chip.on {
+    color: #7dd3fc; background: rgba(56,189,248,.14); border-color: rgba(56,189,248,.45);
+    box-shadow: 0 0 10px rgba(56,189,248,.18);
+  }
 
   .user-sub {
     display: flex; align-items: center; gap: 8px;
@@ -1915,6 +1925,11 @@
               <span class="pulse-dot"></span>
               <span id="statusText">IDLE</span>
             </div>
+            <div class="mode-chips" id="modeChips">
+              <span class="mode-chip" data-mode="idle">IDLE</span>
+              <span class="mode-chip" data-mode="fishing">FISHING</span>
+              <span class="mode-chip" data-mode="eden">EDEN</span>
+            </div>
           </div>
           <div class="user-sub">
             <span style="color:var(--accent)">◈</span>
@@ -3387,6 +3402,15 @@ function renderAll() {
   document.getElementById('statusText').textContent = STATE.running ? (STATE.paused ? 'PAUSED' : 'LIVE') : (STATE.phase || 'IDLE').toUpperCase();
   document.getElementById('statusPill').classList.toggle('live', STATE.running && !STATE.paused);
   document.getElementById('statusPill').classList.toggle('paused', !!(STATE.running && STATE.paused));
+  const activeModes = new Set();
+  if (!STATE.running) activeModes.add('idle');
+  else {
+    if (STATE.cfg && STATE.cfg.fish_on) activeModes.add('fishing');
+    if (STATE.cfg && STATE.cfg.eden_on) activeModes.add('eden');
+    if (!activeModes.size) activeModes.add('idle');
+  }
+  document.querySelectorAll('#modeChips .mode-chip').forEach(el =>
+    el.classList.toggle('on', activeModes.has(el.dataset.mode)));
   document.getElementById('uptimeText').textContent = STATE.uptime;
   document.getElementById('robloxPill').classList.toggle('linked', STATE.roblox_up);
   document.getElementById('robloxText').textContent = STATE.roblox_up ? 'ROBLOX: LINKED' : 'ROBLOX: OFFLINE';
