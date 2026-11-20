@@ -2895,6 +2895,12 @@ class MacroEngine:
         game.INTERRUPT = self.dropped
         try:
             work()
+            # double-check: clear any Inventory/menu left open by a swallowed click
+            try:
+                self.close_guis()
+                game.release_all()
+            except Exception:
+                pass
         finally:
             game.INTERRUPT = None
             if self.dropped():
