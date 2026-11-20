@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*$py.class
+deps/
+build/
+dist/
+*.spec
+*.exe
+*.log
+startup_error.txt
+.vscode/
+.idea/
+dev_console.db
+dev_console.db-*
+*.spec
+mmacro.exe
