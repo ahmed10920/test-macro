@@ -257,7 +257,7 @@ BIOMES_DIR = os.path.join(HERE_DIR, 'biomes')
 os.makedirs(BIOMES_DIR, exist_ok=True)
 
 TITLE = 'Veyra'
-VERSION = '1.0'
+VERSION = '1.0.1'
 REPO_SLUG = os.environ.get('MMACRO_REPO') or 'ahmed10920/veyra-macro'
 RELEASE_PAGE = f'https://github.com/{REPO_SLUG}/releases'
 RELEASES = os.environ.get('MMACRO_UPDATE_URL') or f'https://api.github.com/repos/{REPO_SLUG}/releases?per_page=5'
