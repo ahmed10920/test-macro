@@ -320,8 +320,10 @@
   .mode-chip {
     padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 700;
     letter-spacing: .03em; color: var(--dim); background: rgba(255,255,255,.04);
-    border: 1px solid rgba(255,255,255,.09); white-space: nowrap;
+    border: 1px solid rgba(255,255,255,.09); white-space: nowrap; cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
   }
+  .mode-chip:hover { color: #fff; border-color: rgba(56,189,248,.5); }
   .mode-chip.on {
     color: #7dd3fc; background: rgba(56,189,248,.14); border-color: rgba(56,189,248,.45);
     box-shadow: 0 0 10px rgba(56,189,248,.18);
@@ -1926,9 +1928,9 @@
               <span id="statusText">IDLE</span>
             </div>
             <div class="mode-chips" id="modeChips">
-              <span class="mode-chip" data-mode="idle">IDLE</span>
-              <span class="mode-chip" data-mode="fishing">FISHING</span>
-              <span class="mode-chip" data-mode="eden">EDEN</span>
+              <span class="mode-chip" data-mode="idle" onclick="setMode('idle')" title="Idle — no fishing or Eden">IDLE</span>
+              <span class="mode-chip" data-mode="fishing" onclick="setMode('fishing')" title="Auto Fishing mode">FISHING</span>
+              <span class="mode-chip" data-mode="eden" onclick="setMode('eden')" title="Eden Hunter mode">EDEN</span>
             </div>
           </div>
           <div class="user-sub">
@@ -2892,6 +2894,25 @@ async function toggleCfg(key) {
   STATE.cfg[key] = !STATE.cfg[key];
   await apiCall('update_cfg', { [key]: STATE.cfg[key] });
   renderAll();
+}
+
+async function setMode(mode) {
+  const patch = {};
+  if (mode === 'idle') {
+    // keep Anti-AFK and Aura Clip as they are; merchant detection stays for alerts only
+    ['equip_on','auto_reconnect','auto_items','pop_on','fish_on',
+     'collect_on','eden_on','selector_on','rune_on'].forEach(k => { patch[k] = false; });
+    patch.merchant_on = true;   // alerts on, but collect_on is off so no auto teleport
+  } else {
+    const fishing = mode === 'fishing';
+    patch.fish_on = fishing;
+    patch.eden_on = !fishing;
+  }
+  Object.assign(STATE.cfg, patch);
+  await apiCall('update_cfg', patch);
+  renderAll();
+  showToast(mode === 'idle' ? 'Idle mode — Anti-AFK & Aura Clip kept' :
+            (mode === 'fishing' ? 'Auto Fishing mode' : 'Eden mode'));
 }
 
 async function toggleExclusive(key, otherKey, otherLabel) {
