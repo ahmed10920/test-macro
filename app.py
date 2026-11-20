@@ -1107,6 +1107,7 @@ def normalize_cfg(raw):
     cfg = dict(game.DEFAULTS)
     if isinstance(raw, dict):
         cfg.update(raw)
+    cfg.setdefault('silent_merchant', False)
     cfg.setdefault('rune_on', False)
     cfg.setdefault('rune_biomes', list(RUNE_BIOMES))
     cfg.setdefault('rune_after', 0)
@@ -1432,6 +1433,7 @@ class MacroEngine:
                     'anti_afk': self.cfg_bool('anti_afk', True),
                     'yield_pc': self.cfg_bool('yield_pc', True),
                     'merchant_on': self.cfg_bool('merchant_on'),
+                    'silent_merchant': self.cfg_bool('silent_merchant'),
                     'webhook_url': clean_url(self.cfg_str('webhook_url')),
                     'private_server': game.tidy_link(self.cfg_str('private_server')),
                     'auto_reconnect': self.cfg_bool('auto_reconnect'),
@@ -1898,8 +1900,11 @@ class MacroEngine:
                                   posted[merchant])
         except Exception:
             pass
-        post_merchant(url or self.url, merchant, self.server_link or game.load_settings().get('private_server', ''),
-                      watch=list(self.wanted), collect=self.collect and merchant in self.collect_names, how=how)
+        if not self.cfg_bool('silent_merchant'):
+            post_merchant(url or self.url, merchant, self.server_link or game.load_settings().get('private_server', ''),
+                          watch=list(self.wanted), collect=self.collect and merchant in self.collect_names, how=how)
+        else:
+            note('merchant', 'silent mode: no spawn alert sent')
         self._set(phase='%s arrived' % merchant, colour=GOOD)
         if self.collect and merchant in self.collect_names:
             self.merchant_due, self.merchant_at, self.merchant_tries = merchant, time.monotonic(), 0
@@ -2786,6 +2791,7 @@ class MacroEngine:
             note('fishing', 'webhook: %s: %s' % (type(e).__name__, e))
 
     def collect_merchant(self, name, halt):
+        silent = self.cfg_bool('silent_merchant')
         say = lambda m: note('merchant', m)
         self._set(phase='going to %s' % name, colour=GOOD)
         moved, got = True, None
@@ -2797,15 +2803,16 @@ class MacroEngine:
             moved = got is not False
             if not got:
                 if not halt() and getattr(self, 'merchant_tries', MERCHANT_TRIES) >= MERCHANT_TRIES:
-                    self.tell("Could not open %s's shop" % name, shop.why or 'The shop did not open',
-                              EMBED_BAD, 'Merchant')
+                    if not silent:
+                        self.tell("Could not open %s's shop" % name, shop.why or 'The shop did not open',
+                                  EMBED_BAD, 'Merchant')
                 elif not halt():
                     say('%s: trying again while %s is here' % (shop.why or 'the shop did not open', name))
                 self.close_guis()
                 return False
             found, bought = got
             # Rin always has the same stock: only announce that it spawned, no manifest.
-            if name != 'Rin':
+            if name != 'Rin' and not silent:
                 items = ', '.join(found[s] for s in sorted(found)) or 'Could not read the items'
                 post_event(self.url, '%s Shop Manifest — %s' % (MERCHANT_BADGES.get(name, '🛰️'), name),
                            '-# Radar scan complete · shop inventory read',
@@ -2816,7 +2823,8 @@ class MacroEngine:
             shop.close_shop()
         except Exception as e:
             say('failed - %s: %s' % (type(e).__name__, e))
-            self.tell('Merchant collection failed', '`%s: %s`' % (type(e).__name__, e), EMBED_BAD, 'Merchant')
+            if not silent:
+                self.tell('Merchant collection failed', '`%s: %s`' % (type(e).__name__, e), EMBED_BAD, 'Merchant')
             self.merchant_tries = MERCHANT_TRIES
             try:
                 shop.close_shop()

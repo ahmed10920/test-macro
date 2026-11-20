@@ -2198,6 +2198,10 @@
               <div class="switch" id="sw-collect_on" onclick="toggleCfg('collect_on')"></div>
             </div>
             <div class="row">
+              <div class="row-info"><div class="row-lbl">Silent Merchant</div><div class="row-hint">Hides spawn alerts, manifests and merchant errors from Discord — still teleports &amp; buys. Keeps your private server private.</div></div>
+              <div class="switch" id="sw-silent_merchant" onclick="toggleCfg('silent_merchant')"></div>
+            </div>
+            <div class="row">
               <div class="row-info"><div class="row-lbl">Teleport To Merchants</div><div class="row-hint">Choose which merchants trigger teleportation</div></div>
               <div style="display:flex;gap:12px;align-items:center">
                 <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-merch-Jester" onclick="toggleMerchName('Jester')"></div> Jester</label>
@@ -3531,7 +3535,7 @@ function renderAll() {
   // Toggles & sub-panels
   ['anti_afk','yield_pc','clip_on','clip_key_on','equip_on','auto_reconnect','rejoin_browser','fx_on',
    'fish_on','fish_vip','fish_sell_all','fish_full_check','auto_items','rune_on','selector_on',
-   'pop_on','merchant_on','collect_on','eden_on','eden_path','eden_record','auto_update','discord_rpc'].forEach(k => setSw('sw-' + k, c[k]));
+   'pop_on','merchant_on','collect_on','silent_merchant','eden_on','eden_path','eden_record','auto_update','discord_rpc'].forEach(k => setSw('sw-' + k, c[k]));
   applyTheme(c.theme || 'dark');
   const discordSt = STATE.discord_status || {};
   const discordStatusEl = document.getElementById('discordRpcStatus');
