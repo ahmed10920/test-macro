@@ -2652,7 +2652,7 @@ function openTutorial() {
       popover: {
         title: '👤 IMPORTANT 1/3 — Roblox username',
         description: 'Type your <b>exact Roblox username</b> here (the name on your Roblox profile, not your display name). It is used on the Dashboard, in the “Macro started” webhook, and on your Discord activity.<br><br>Leave it <b>empty</b> and Veyra will detect it from Roblox automatically. If you type it yourself, click <b>✓ Save Username</b>.',
-        side: 'right'
+        side: 'bottom'
       }
     },
     {
@@ -2661,7 +2661,7 @@ function openTutorial() {
       popover: {
         title: '🔔 IMPORTANT 2/3 — Discord webhook URL',
         description: 'This is how Veyra sends biome, merchant and start/stop alerts to Discord.<br><br><b>How to get it:</b> get the webhook URL from your webhook provider. Paste the whole <code>https://discord.com/api/webhooks/...</code> link here.<br><br>Then click <b>🔔 Test Webhook</b>. A test message means it is correct. <b>Never share this link</b> — anyone with it can post in your channel.',
-        side: 'right'
+        side: 'bottom'
       }
     },
     {
@@ -2670,7 +2670,7 @@ function openTutorial() {
       popover: {
         title: '🔗 IMPORTANT 3/3 — Private server link',
         description: 'Veyra needs this to rejoin automatically when Roblox disconnects or freezes.<br><br><b>How to get it:</b> open Sol’s RNG on Roblox → <b>Servers</b> → <b>Private Servers</b> → create or open yours → <b>Share</b> → <b>Copy Link</b>. Paste the full <code>https://www.roblox.com/share?code=...</code> link here.<br><br>Without it, <b>Auto Reconnect</b> will not work. Also be in that same private server before you press F1.',
-        side: 'right'
+        side: 'bottom'
       }
     },
     {
@@ -2704,10 +2704,12 @@ function openTutorial() {
     showProgress: true,
     animate: true,
     smoothScroll: true,
-    allowClose: true,
-    stagePadding: 10,
+    allowClose: false,
+    overlayClickBehavior: 'none',
+    disableActiveInteraction: false,
+    stagePadding: 14,
     stageRadius: 14,
-    overlayOpacity: 0.78,
+    overlayOpacity: 0.85,
     popoverClass: 'mmacro-tour',
     nextBtnText: 'Next →',
     prevBtnText: '← Back',
