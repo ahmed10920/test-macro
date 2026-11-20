@@ -2150,23 +2150,6 @@
               <div class="switch" id="sw-auto_items" onclick="toggleCfg('auto_items')"></div>
             </div>
             <div class="row">
-              <div class="row-info"><div class="row-lbl">Auto Rune Pop</div><div class="row-hint">Uses a Cursed Rune Fragment after a chosen event biome runs for N seconds</div></div>
-              <div class="switch" id="sw-rune_on" onclick="toggleCfg('rune_on')"></div>
-            </div>
-            <div class="sub-panel" id="sub-rune_on">
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-                <span style="font-size:12px;color:var(--subtext)">Target Biomes:</span>
-                <div style="display:flex;gap:14px;align-items:center">
-                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-rune-PUMPKIN MOON" onclick="toggleRuneBiome('PUMPKIN MOON')"></div> Pumpkin Moon</label>
-                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-rune-GRAVEYARD" onclick="toggleRuneBiome('GRAVEYARD')"></div> Graveyard</label>
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;justify-content:space-between">
-                <span style="font-size:12px;color:var(--subtext)">Use After Delay (seconds):</span>
-                <input class="input center" id="inp-rune_after" onchange="saveInt('rune_after', this.value, 0)" />
-              </div>
-            </div>
-            <div class="row">
               <div class="row-info"><div class="row-lbl">Auto Biome Selector</div><div class="row-hint">Activates your chosen Drive every hour when off cooldown</div></div>
               <div class="switch" id="sw-selector_on" onclick="toggleCfg('selector_on')"></div>
             </div>
@@ -2281,15 +2264,31 @@
         <section class="page" id="page-event">
           <div class="card">
             <div class="card-hdr">
-              <div><div class="card-title">Cursed Rune</div><div class="card-sub">Cursed Rune Fragment — used automatically on your event biomes</div></div>
+              <div><div class="card-title">Cursed Rune</div><div class="card-sub">Halloween event — Cursed Rune Fragment is used automatically on your event biomes</div></div>
               <span class="badge">EVENT</span>
             </div>
             <div style="padding:16px 20px;display:flex;gap:20px;align-items:center;flex-wrap:wrap">
               <img src="/ui/items/rune_icon.png" style="width:104px;height:104px;border-radius:14px" alt="Cursed Rune" />
               <div style="flex:1;min-width:240px">
                 <div class="row-lbl">Cursed Rune Fragment</div>
-                <div class="row-hint">When <b>Auto Rune Pop</b> is enabled in Items &amp; Potions, Veyra uses a Cursed Rune Fragment as soon as one of your selected event biomes starts. Choose the biomes and the delay there.</div>
-                <button class="btn-sm" style="margin-top:12px" onclick="switchTab('items')">Open Items &amp; Potions →</button>
+                <div class="row-hint">Veyra uses a Cursed Rune Fragment as soon as one of your selected event biomes starts.</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto Rune Pop</div><div class="row-hint">Uses a Cursed Rune Fragment after a chosen event biome runs for N seconds</div></div>
+              <div class="switch" id="sw-rune_on" onclick="toggleCfg('rune_on')"></div>
+            </div>
+            <div class="sub-panel" id="sub-rune_on">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+                <span style="font-size:12px;color:var(--subtext)">Target Biomes:</span>
+                <div style="display:flex;gap:14px;align-items:center">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-rune-PUMPKIN MOON" onclick="toggleRuneBiome('PUMPKIN MOON')"></div> Pumpkin Moon</label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><div class="switch sm" id="sw-rune-GRAVEYARD" onclick="toggleRuneBiome('GRAVEYARD')"></div> Graveyard</label>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:12px;color:var(--subtext)">Use After Delay (seconds):</span>
+                <input class="input center" id="inp-rune_after" onchange="saveInt('rune_after', this.value, 0)" />
               </div>
             </div>
           </div>
