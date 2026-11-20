@@ -1585,9 +1585,9 @@ class MacroEngine:
                     'state': 'Idle',
                     'buttons': [{'label': '🌐 Download Veyra', 'url': RELEASE_PAGE}],
                     'assets': {
-                        'large_image': 'brand_bh',
+                        'large_image': 'macro_logo',
                         'large_text': 'Veyra',
-                        'small_image': 'brand_bh',
+                        'small_image': 'macro_logo',
                         'small_text': 'Idle',
                     },
                 })
@@ -1611,7 +1611,7 @@ class MacroEngine:
                 'assets': {
                     'large_image': slug,
                     'large_text': label,
-                    'small_image': 'brand_bh',
+                    'small_image': 'macro_logo',
                     'small_text': ('Equipped "%s"' % aura) if aura else 'Veyra',
                 },
             })
@@ -2076,7 +2076,8 @@ class MacroEngine:
         return None
 
     def tell(self, title, detail='', colour=None, area='Macro'):
-        thumb = biome_png(self.biome_now) if area in ('Biome', 'Pop', 'Rune', 'Selector') and self.biome_now else None
+        thumb = (asset_png('rune_icon.png') if area == 'Rune'
+                 else biome_png(self.biome_now) if area in ('Biome', 'Pop', 'Selector') and self.biome_now else None)
         post_event(self.url, title, detail, colour if colour is not None else EMBED_INFO, area, thumb=thumb)
         self._set(phase='%s%s' % (title, ' - ' + detail if detail else ''))
 

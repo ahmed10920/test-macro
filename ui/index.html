@@ -2509,7 +2509,7 @@
             </div>
             <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
               <div>
-                <div class="row-lbl" style="margin-bottom:6px">Discord Webhook URL <span style="opacity:.6;font-weight:400">— Discord → Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL</span></div>
+                <div class="row-lbl" style="margin-bottom:6px">Discord Webhook URL <span style="opacity:.6;font-weight:400">— Get the webhook URL from your webhook provider</span></div>
                 <div style="display:flex;gap:8px">
                   <input class="input" type="password" style="flex:1" id="inp-webhook_url" placeholder="https://discord.com/api/webhooks/..." oninput="autoSaveField('webhook_url', this.value)" onchange="saveField('webhook_url', this.value)" />
                   <button class="btn-sm" id="toggleWhBtn" onclick="toggleWhVis()">Show</button>
@@ -2662,7 +2662,7 @@ function openTutorial() {
       element: '#inp-webhook_url',
       popover: {
         title: '🔔 IMPORTANT 2/3 — Discord webhook URL',
-        description: 'This is how Veyra sends biome, merchant and start/stop alerts to Discord.<br><br><b>How to get it:</b> in Discord open <b>Server Settings → Integrations → Webhooks → New Webhook</b>, pick the channel, then click <b>Copy Webhook URL</b>. Paste the whole <code>https://discord.com/api/webhooks/...</code> link here.<br><br>Then click <b>🔔 Test Webhook</b>. A test message means it is correct. <b>Never share this link</b> — anyone with it can post in your channel.',
+        description: 'This is how Veyra sends biome, merchant and start/stop alerts to Discord.<br><br><b>How to get it:</b> get the webhook URL from your webhook provider. Paste the whole <code>https://discord.com/api/webhooks/...</code> link here.<br><br>Then click <b>🔔 Test Webhook</b>. A test message means it is correct. <b>Never share this link</b> — anyone with it can post in your channel.',
         side: 'right'
       }
     },
