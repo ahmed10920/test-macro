@@ -328,6 +328,10 @@
     color: #7dd3fc; background: rgba(56,189,248,.14); border-color: rgba(56,189,248,.45);
     box-shadow: 0 0 10px rgba(56,189,248,.18);
   }
+  .mode-chip.on[data-mode="fishing"] {
+    color: #4ade80; background: rgba(34,197,94,.16); border-color: rgba(34,197,94,.55);
+    box-shadow: 0 0 12px rgba(34,197,94,.35);
+  }
 
   .user-sub {
     display: flex; align-items: center; gap: 8px;
@@ -2911,12 +2915,17 @@ async function setMode(mode) {
     const fishing = mode === 'fishing';
     patch.fish_on = fishing;
     patch.eden_on = !fishing;
+    if (fishing) {
+      // fishing runs merchant + boss detection and auto-collection alongside it
+      patch.merchant_on = true;
+      patch.collect_on = true;
+    }
   }
   Object.assign(STATE.cfg, patch);
   await apiCall('update_cfg', patch);
   renderAll();
   showToast(mode === 'idle' ? 'Idle mode — Anti-AFK & Aura Clip kept' :
-            (mode === 'fishing' ? 'Auto Fishing mode' : 'Eden mode'));
+            (mode === 'fishing' ? 'Fishing mode — merchant & boss auto-collection on' : 'Eden mode'));
 }
 
 async function toggleExclusive(key, otherKey, otherLabel) {
