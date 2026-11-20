@@ -1799,7 +1799,7 @@
 
       <div class="intro-star-mover" id="introStarMover">
         <div class="intro-slash-flare" id="introSlashFlare"></div>
-        <img class="intro-star-ghost" id="introStarGhost" src="/ui/brand_logo.png" alt="" />
+        <img class="intro-star-ghost" id="introStarGhost" src="/ui/brand_bh.png" alt="" />
         <svg class="intro-star-main intro-mark bh" id="introStarMain" viewBox="0 0 980 980" aria-label="Veyra">
 <rect width="980" height="980" rx="210" fill="#000"/>
 <path class="part shape p0" fill-rule="evenodd" d="M 978.1 769.5 L 976.2 771.4 L 975.2 775.2 L 968.5 782.9 L 968.5 785.7 L 965.6 791.5 L 958.9 798.2 L 958.0 802.9 L 947.5 815.4 L 946.5 820.2 L 941.7 825.0 L 941.7 880.5 L 937.9 884.3 L 936.0 882.4 L 923.5 880.5 L 909.2 875.7 L 905.4 872.8 L 892.9 870.9 L 867.1 862.3 L 863.2 859.4 L 859.4 859.4 L 859.4 861.3 L 861.3 863.2 L 861.3 869.0 L 864.2 872.8 L 870.9 892.9 L 872.8 905.4 L 875.7 909.2 L 880.5 923.5 L 882.4 936.0 L 884.3 938.8 L 881.4 941.7 L 825.0 941.7 L 820.2 946.5 L 815.4 947.5 L 802.9 958.0 L 798.2 958.9 L 790.5 965.6 L 785.7 968.5 L 782.9 968.5 L 775.2 975.2 L 773.3 975.2 L 769.5 978.1 L 978.1 978.1 Z M 913.0 916.8 L 917.8 913.0 L 919.7 914.9 L 924.5 914.9 L 926.4 916.8 L 931.2 917.8 L 935.0 917.8 L 937.9 918.8 L 939.8 919.7 L 939.8 941.7 L 924.5 941.7 L 919.7 939.8 L 918.8 937.9 L 917.8 935.0 L 917.8 930.2 L 916.8 926.4 L 914.9 924.5 L 914.9 918.8 Z" fill="#fff" style="--len:845;--delay:0.15s;--dur:0.75s"/>
@@ -1841,7 +1841,7 @@
     <aside class="sidebar">
       <div class="brand" onclick="switchTab('dashboard')">
         <div class="brand-crest" id="brandCrest">
-          <img id="brandCrestLogo" src="/ui/brand_logo.png" alt="Veyra" style="width:38px;height:38px;object-fit:cover;border-radius:11px;opacity:0;transform:scale(0.5);transition:opacity 0.2s ease, transform 0.25s ease;" />
+          <img id="brandCrestLogo" src="/ui/brand_bh.png" alt="Veyra" style="width:38px;height:38px;object-fit:cover;border-radius:11px;opacity:0;transform:scale(0.5);transition:opacity 0.2s ease, transform 0.25s ease;" />
         </div>
         <div>
           <div class="brand-title">VEYRA</div>
@@ -1881,6 +1881,11 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
           <span>Merchants &amp; Eden</span>
           <span class="nav-dot" id="dot-merchant"></span>
+        </div>
+        <div class="nav-item" data-tab="event" onclick="switchTab('event')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="4"/></svg>
+          <span>Event</span>
+          <span class="nav-dot" id="dot-event"></span>
         </div>
         <div class="nav-item" data-tab="credits" onclick="switchTab('credits')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
@@ -2258,6 +2263,25 @@
         </section>
 
         <!-- PAGE 6: BIOME COUNTS (READ-ONLY) -->
+        <section class="page" id="page-event">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title">Auto Rune Pop</div><div class="card-sub">Use a Cursed Rune Fragment as soon as one of your event biomes starts</div></div>
+              <span class="badge">EVENT</span>
+            </div>
+            <div class="row">
+              <div class="row-info"><div class="row-lbl">Auto Rune Pop</div><div class="row-hint">Watches for your selected event biomes and pops a rune automatically when one arrives</div></div>
+              <div class="switch" id="sw-rune_on_event" onclick="toggleCfg('rune_on')"></div>
+            </div>
+            <div class="sub-panel" id="sub-rune_on_event">
+              <div class="row">
+                <div class="row-info"><div class="row-lbl">Rune Delay</div><div class="row-hint">Seconds to wait after the biome starts</div></div>
+                <input class="input" id="inp-rune_after_event" style="width:100px" type="number" min="0" onchange="saveField('rune_after', this.value)" />
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="page" id="page-biomes">
           <div class="glass-card counts-card" id="biomeCountsCard" style="margin-top:0">
             <div class="counts-hdr">
@@ -2764,7 +2788,7 @@ function switchTab(tab) {
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('active', el.id === 'page-' + tab));
   const titles = {
     dashboard: 'Dashboard', macro: 'Macro & Core', fishing: 'Auto Fishing',
-    items: 'Items & Potions', merchant: 'Merchants & Eden',
+    items: 'Items & Potions', merchant: 'Merchants & Eden', event: 'Event',
     biomes: 'Biome Counts', credits: 'Activity & Credits', settings: 'Settings', webhook: 'Webhook'
   };
   document.getElementById('pageTitle').textContent = titles[tab] || 'Dashboard';
@@ -3379,6 +3403,7 @@ function renderAll() {
   document.getElementById('dot-macro').classList.toggle('on', !!(c.anti_afk || c.clip_on || c.equip_on || c.auto_reconnect));
   document.getElementById('dot-fishing').classList.toggle('on', !!c.fish_on);
   document.getElementById('dot-items').classList.toggle('on', !!(c.auto_items || c.rune_on || c.selector_on || c.pop_on));
+  document.getElementById('dot-event').classList.toggle('on', !!c.rune_on);
   document.getElementById('dot-merchant').classList.toggle('on', !!(c.merchant_on || c.collect_on || c.eden_on));
 
   // Dashboard cards
@@ -3463,6 +3488,10 @@ function renderAll() {
   ['anti_afk','yield_pc','clip_on','clip_key_on','equip_on','auto_reconnect','rejoin_browser','fx_on',
    'fish_on','fish_vip','fish_sell_all','fish_full_check','auto_items','rune_on','selector_on',
    'pop_on','merchant_on','collect_on','eden_on','eden_path','eden_record','auto_update','discord_rpc'].forEach(k => setSw('sw-' + k, c[k]));
+   setSw('sw-rune_on_event', c.rune_on);
+   setSub('rune_on_event', c.rune_on);
+   const runeAfterInput = document.getElementById('inp-rune_after_event');
+   if (runeAfterInput && document.activeElement !== runeAfterInput) runeAfterInput.value = c.rune_after ?? 0;
   applyTheme(c.theme || 'dark');
   const discordSt = STATE.discord_status || {};
   const discordStatusEl = document.getElementById('discordRpcStatus');

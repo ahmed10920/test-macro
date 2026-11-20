@@ -934,7 +934,7 @@ def resolve_avatar_file(uid=''):
         candidates.append(os.path.join(game.APP_DIR, 'avatar_%s.png' % uid))
     candidates.extend([
         os.path.join(game.APP_DIR, 'avatar.png'),
-        os.path.join(HERE_DIR, 'ui', 'brand_logo.png'),
+        os.path.join(HERE_DIR, 'ui', 'brand_bh.png'),
     ])
     for p in candidates:
         if p and os.path.isfile(p):
@@ -1999,7 +1999,7 @@ class MacroEngine:
                 how = 'Clipped using hotkey' if path is True else 'clips\\%s' % os.path.basename(path)
                 post_event(self.url, 'Aura Clipped - %s' % aura, '', colour, 'Clip',
                            [('Rarity', odds, True), ('Biome', pretty(self.biome_now) or '-', True), ('Clip', how, True)],
-                           shot=shot, thumb=biome_png(self.biome_now))
+                           shot=shot, thumb=asset_png('aura_clip_logo.png'))
         self.clipper.clip('%s' % aura, done)
 
     # --------------------------------------------------------------- Actions
