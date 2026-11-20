@@ -836,7 +836,7 @@ def post_alert(webhook_url, title, detail, colour, area, icon, emoji=''):
     blob = asset_png(icon)
     if blob:
         files['alert.png'] = blob
-        embed['image'] = {'url': 'attachment://alert.png'}
+        embed['thumbnail'] = {'url': 'attachment://alert.png'}
     _post(webhook_url, {'embeds': [embed]}, files)
 
 
