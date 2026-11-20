@@ -2468,17 +2468,29 @@ class MacroEngine:
             note('window', 'sizing the Roblox window failed: %s: %s' % (type(e).__name__, e))
 
     def check_chat_on_start(self):
-        """Detect whether Roblox chat is ON when starting/rejoining and turn it off if open."""
+        """Double-check Roblox chat at start: if open, close it and confirm it stayed closed."""
         try:
             if game.roblox_window() is None:
+                note('chat', 'Roblox is not open: skipping the chat check')
                 return None
-            if game.chat_open():
-                note('chat', 'chat is ON at start: turning it off')
-                ok = game.close_chat()
-                note('chat', 'chat turned OFF' if ok else 'chat still appeared open after clicking toggle')
-                return False
-            note('chat', 'chat is OFF')
-            return True
+            game.paced(0.4)
+            if game.chat_open() is False:
+                game.paced(0.4)                       # double check before trusting the first read
+                if game.chat_open() is False:
+                    note('chat', 'chat is OFF (checked twice)')
+                    return True
+            note('chat', 'chat is ON at start: turning it off')
+            for attempt in range(3):
+                game.close_chat()
+                game.paced(0.5)
+                if game.chat_open() is False:
+                    game.paced(0.4)                   # confirm again after closing
+                    if game.chat_open() is False:
+                        note('chat', 'chat turned OFF and confirmed (attempt %d)' % (attempt + 1))
+                        return True
+                note('chat', 'chat still open after attempt %d, retrying' % (attempt + 1))
+            note('chat', 'chat is still ON after 3 attempts')
+            return False
         except Exception as e:
             note('chat', 'chat check failed: %s: %s' % (type(e).__name__, e))
             return None
