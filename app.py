@@ -335,6 +335,7 @@ STRAY_EVERY_S = 20
 MERCHANT_REPEAT_S = 600
 BOSS_BIOMES = {'Sinister S': 'GRAVEYARD', 'Sinister P.': 'PUMPKIN MOON'}
 BOSS_EARLY_S = 5
+BOSS_HERE_S = 180                  # how long a confirmed boss counts as present
 MERCHANT_TRIES = 3
 
 LOG_MAX = 4 << 20
@@ -1205,6 +1206,7 @@ class MacroEngine:
         self.merchant_at = 0.0
         self._merchant_posted = {}
         self._boss_seen = {}
+        self._boss_here = {}                 # boss -> last confirmed presence (monotonic)
         self.collect = False
         self.wanted = {}
         self.collect_names = set()
@@ -1921,18 +1923,34 @@ class MacroEngine:
                 self.biome_stop = None
             self._set(biome=(failed, BAD) if failed else ('idle', DIM))
 
+    def boss_present(self):
+        """A boss confirmed in-game is still around, so skip the Cursed Rune."""
+        now = time.monotonic()
+        self._boss_here = {b: at for b, at in self._boss_here.items()
+                           if now - at <= BOSS_HERE_S}
+        return bool(self._boss_here)
+
     def merchant_arrived(self, merchant, how, url=None):
         posted = self._merchant_posted
         if time.time() - posted.get(merchant, 0.0) <= MERCHANT_REPEAT_S:
             return
         need = BOSS_BIOMES.get(merchant)
-        # Sinister P. and the Boss always post when detected — no biome gate
-        if need and merchant not in ('Sinister P.', 'Sinister S') and self.biome_now and not rune_biome(self.biome_now, {need}):
-            if time.monotonic() - self._boss_seen.get(merchant, -1e9) > BOSS_EARLY_S:
-                note('merchant', '%s seen outside %s: not posted unless %s starts' % (merchant, pretty(need), pretty(need)))
-            self._boss_seen[merchant] = time.monotonic()
-            return
+        if need:
+            # A cache hit alone is not a spawn: Roblox touches these animation
+            # files while the game is still loading. Only count a boss once we
+            # are really in the game, and only in its own biome. A hit just
+            # before the biome starts is posted by _on_biome_change instead.
+            if not self.connected():
+                self._boss_seen[merchant] = time.monotonic()
+                return
+            if self.biome_now and not rune_biome(self.biome_now, {need}):
+                if time.monotonic() - self._boss_seen.get(merchant, -1e9) > BOSS_EARLY_S:
+                    note('merchant', '%s seen outside %s: not posted unless %s starts' % (merchant, pretty(need), pretty(need)))
+                self._boss_seen[merchant] = time.monotonic()
+                return
         posted[merchant] = time.time()
+        if need:
+            self._boss_here[merchant] = time.monotonic()
         note('merchant', '%s arrived (%s)' % (merchant, how))
         try:
             import local_db
@@ -3053,6 +3071,10 @@ class MacroEngine:
         if biome is None:
             self.rune_due = None
             return
+        if self.boss_present():
+            self.rune_due = None
+            note('rune', '%s started, but a boss is here: no Cursed Rune Fragment used' % pretty(biome))
+            return
         self.rune_due, self.rune_tries = time.monotonic() + self.rune_wait, 0
         note('rune', '%s started: a Cursed Rune Fragment in %d s' % (pretty(biome), self.rune_wait))
 
@@ -3061,6 +3083,10 @@ class MacroEngine:
         biome = rune_biome(self.biome_now, self.rune_biomes)
         if biome is None:
             say('the biome is over (%s now): no Cursed Rune Fragment used' % (pretty(self.biome_now) or 'unknown'))
+            self.rune_due = None
+            return
+        if self.boss_present():
+            say('a boss is here: no Cursed Rune Fragment used')
             self.rune_due = None
             return
         try:
