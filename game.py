@@ -859,6 +859,15 @@ def take_foreground(tries=5, gap=0.35):
     return None
 
 
+def make_roblox_topmost():
+    """Bring Roblox to the foreground — used when the user wants it always on top.
+    Returns the window, or None if not found/minimised."""
+    try:
+        return focus_roblox(verify=True)
+    except RuntimeError:
+        return roblox_window()
+
+
 FRONT_CLICK = 'merchantShopCloseButton'     # a dead spot, top right
 FRONT_CLICK_EVERY = 5.0                     # min s between tries
 _clicked_front = 0.0
@@ -1420,23 +1429,25 @@ def flash_warning_up():
 
 def skip_intro(stop=lambda: False, say=lambda m: None):
     """Click through Sol's RNG's FLASH WARNING / intro screens after joining.
-    Only clicks at the known "Click here to skip" position (bottom-centre of the
-    loading screen, ~75% client height, centre-x) — precise and resolution-independent
-    via percentages of the client box."""
+    Waits 5 seconds after the flash warning appears, then clicks the "Click here
+    to skip" position (bottom-centre, ~75% client height, centre-x) 3 times."""
     skipped = 0
-    for _ in range(4):
+    for _ in range(3):
         if stop() or not flash_warning_up():
             break
+        # Wait 5 seconds after the flash warning appears before clicking
+        for _ in range(50):
+            if stop() or not flash_warning_up():
+                break
+            time.sleep(0.1)
         box = client_box((0.0, 0.0, 1.0, 1.0))
         cx = (box[0] + box[2]) // 2          # centre horizontally
         ch = box[3] - box[1]
         # Known position: "Click here to skip" sits near the bottom of the loading screen.
-        # 75% y from top, centre-x. 4 retries at the same position, spaced out,
-        # each preceded by a flash_warning_up() check.
         cy = box[1] + int(ch * 0.75)
         click(cx, cy, park=False, settle=0.3)
         skipped += 1
-        time.sleep(0.5)
+        time.sleep(1.0)
     if skipped:
         say('clicked through the intro (%d)' % skipped)
     return skipped
@@ -1831,6 +1842,8 @@ FISH_POINTS = (
 MERCHANT_POINTS = (
     ('inventoryInvClose', 'Inventory: close (X)'),
     ('merchantShopSetToMaxButton', 'Merchant shop: Set to Max'),
+    # Skip Intro: lower-centre of client (~75% height, centre-x) where "Click here to skip" lives
+    ('skip_lower_centre', 'Skip Intro: lower centre (~75% height)'),
     ('merchantShopPurchaseAmountBox', 'Merchant shop: amount box'),
     ('merchantShopPurchaseButton', 'Merchant shop: Purchase'),
     ('merchantShopCloseButton', 'Merchant shop: close (X)'),

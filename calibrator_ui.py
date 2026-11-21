@@ -491,7 +491,14 @@ def run(mode='all'):
         dark_titlebar(r)
         messagebox.showinfo('Veyra', 'Open Roblox first, then calibrate.')
         return
-    pts = game.PLAY_POINT if mode == 'play' else eden.POINTS if mode == 'contract' else None
+    if mode == 'play':
+        pts = game.PLAY_POINT
+    elif mode == 'contract':
+        pts = eden.POINTS
+    elif mode == 'skip':
+        pts = tuple(p for p in game.MERCHANT_POINTS if p[0] == 'skip_lower_centre')
+    else:
+        pts = None
     CalibrateWindow(pts).mainloop()
 
 

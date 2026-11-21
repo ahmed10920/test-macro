@@ -2483,6 +2483,10 @@
               <div class="switch" id="sw-on_top" onclick="toggleOnTop()"></div>
             </div>
             <div class="row">
+              <div class="row-info"><div class="row-lbl">Keep Roblox on top</div><div class="row-hint">Re-brings Roblox to the foreground when it falls behind</div></div>
+              <div class="switch" id="sw-roblox_on_top" onclick="toggleCfg('roblox_on_top')"></div>
+            </div>
+            <div class="row">
               <div class="row-info"><div class="row-lbl">Auto-Update on Launch</div><div class="row-hint">Automatically downloads and installs new updates whenever you open Veyra</div></div>
               <div class="row-actions">
                 <span class="mono" style="font-size:11px;color:var(--dim)" id="updateStatusText">Up to date</span>
@@ -3545,7 +3549,7 @@ function renderAll() {
     }
   }
   document.querySelectorAll('#modeChips .mode-chip').forEach(el => {
-    if (el.id === 'devChip') return;
+    if (el.id === 'devChip') return;  // always show DEV chip
     if (!devLocked) {
       el.style.display = 'none';
     } else {
@@ -3642,9 +3646,10 @@ function renderAll() {
     ['Fishing', 'fish_on', ['eden_on', 'Eden Detector']],
     ['Merchants', 'merchant_on', null],
     ['Eden Hunt', 'eden_on', ['fish_on', 'Auto Fishing']],
+    ['SKIP', 'skip', null, "openCalibrator('skip')", 'Calibrate skip intro position'],
   ];
-  document.getElementById('matrixGrid').innerHTML = chips.map(([lbl, key, excl]) => `
-    <div class="chip ${c[key] ? 'on' : ''}" onclick="${excl ? `toggleExclusive('${key}','${excl[0]}','${excl[1]}')` : `toggleCfg('${key}')`}">
+  document.getElementById('matrixGrid').innerHTML = chips.map(([lbl, key, excl, act, tip]) => `
+    <div class="chip ${key && c[key] ? 'on' : ''}" title="${tip || ''}" onclick="${act || (excl ? `toggleExclusive('${key}','${excl[0]}','${excl[1]}')` : `toggleCfg('${key}')`)}">
       <span class="chip-dot"></span><span>${lbl}</span>
     </div>
   `).join('');

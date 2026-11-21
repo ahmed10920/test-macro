@@ -253,7 +253,7 @@ BIOMES_DIR = os.path.join(HERE_DIR, 'biomes')
 os.makedirs(BIOMES_DIR, exist_ok=True)
 
 TITLE = 'Veyra'
-VERSION = '1.0.2'
+VERSION = '1.0.3'
 
 # Unified developer-mode passkey (baked into the .exe; session-only unlock).
 # Only the person who knows this key can open Developer Mode.
@@ -333,7 +333,7 @@ DAILY_UTC_S = 22 * 3600 + 60
 DAILY_LATE_S = 90
 STRAY_EVERY_S = 20
 MERCHANT_REPEAT_S = 600
-BOSS_BIOMES = {'Boss': 'GRAVEYARD', 'Sinister P.': 'PUMPKIN MOON'}
+BOSS_BIOMES = {'Sinister S': 'GRAVEYARD', 'Sinister P.': 'PUMPKIN MOON'}
 BOSS_EARLY_S = 5
 MERCHANT_TRIES = 3
 
@@ -499,19 +499,21 @@ BIOME_RATES = {
 
 PING = {'GLITCH', 'GLITCHED', 'DREAMSPACE', 'CYBERSPACE'}
 CLIP_COLOURS = ((10 ** 10, 0xFFC94D), (10 ** 9, 0xB38CFF), (10 ** 8, 0x58B9FF), (1, EMBED_GOOD))
-MERCHANT_COLOURS = {'Rin': 0xFF8C00, 'Mari': 0xFFD700, 'Jester': 0x9B59B6, 'Boss': 0x6A0DAD, 'Sinister P.': 0x6A0DAD}
-MERCHANT_BADGES = {'Rin': '🟠', 'Mari': '🟡', 'Jester': '🟣', 'Boss': '☠️', 'Sinister P.': '☠️'}
-MERCHANT_STATUS = {'Boss': 'BOSS SIGNAL LOCKED', 'Sinister P.': 'BOSS SIGNAL LOCKED'}
+MERCHANT_COLOURS = {'Rin': 0xFF8C00, 'Mari': 0xFFD700, 'Jester': 0x9B59B6, 'Sinister S': 0x6A0DAD, 'Sinister P.': 0xFF7A00}
+MERCHANT_BADGES = {'Rin': '🟠', 'Mari': '🟡', 'Jester': '🟣', 'Sinister S': '☠️', 'Sinister P.': '☠️'}
+MERCHANT_STATUS = {'Sinister S': 'BOSS SIGNAL LOCKED', 'Sinister P.': 'BOSS SIGNAL LOCKED'}
 MERCHANT_FACES = {'Rin': 'merchant_rin.png', 'Jester': 'merchant_jester.png', 'Mari': 'merchant_mari.png'}
 _merchant_icons = {}
 
 
 def merchant_icon(name=''):
-    """Bytes of that merchant's portrait (or the radar emblem for the rest), cached once."""
-    key = MERCHANT_FACES.get(name, 'merchant_tracker.png')
+    """Bytes of that merchant's portrait (boss compass emblem for bosses), cached once."""
+    boss = name in BOSS_BIOMES
+    key = 'boss_alert.png' if boss else MERCHANT_FACES.get(name, 'merchant_tracker.png')
     if key not in _merchant_icons:
+        folder = 'ui' if boss else os.path.join('ui', 'items')
         try:
-            with open(os.path.join(HERE_DIR, 'ui', 'items', key), 'rb') as f:
+            with open(os.path.join(HERE_DIR, folder, key), 'rb') as f:
                 _merchant_icons[key] = f.read()
         except OSError:
             _merchant_icons[key] = None
@@ -798,12 +800,12 @@ def post_merchant(webhook_url, name, server='', watch=None, collect=False, how='
     """Merchant arrival: the radar-terminal card with that merchant's own logo."""
     if not webhook_url:
         return
-    badge = '' if name == 'Boss' else MERCHANT_BADGES.get(name, '')
+    badge = '' if name == 'Sinister S' else MERCHANT_BADGES.get(name, '')
     status = MERCHANT_STATUS.get(name, 'MERCHANT SIGNAL LOCKED')
     colour = MERCHANT_COLOURS.get(name, EMBED_GOLD)
     now = int(time.time())
     action = 'TELEPORT ARMED' if collect else 'ALERT ONLY'
-    title = 'Sinister boss has arrived in grave yard' if name == 'Boss' else '%s %s' % (badge, status)
+    title = 'Sinister boss has arrived in Graveyard' if name == 'Sinister S' else '%s %s' % (badge, status)
     description = '\n'.join([
         merchant_card(name, 'IN YOUR SERVER', action),
         '',
@@ -1924,7 +1926,8 @@ class MacroEngine:
         if time.time() - posted.get(merchant, 0.0) <= MERCHANT_REPEAT_S:
             return
         need = BOSS_BIOMES.get(merchant)
-        if need and self.biome_now and not rune_biome(self.biome_now, {need}):
+        # Sinister P. and the Boss always post when detected — no biome gate
+        if need and merchant not in ('Sinister P.', 'Sinister S') and self.biome_now and not rune_biome(self.biome_now, {need}):
             if time.monotonic() - self._boss_seen.get(merchant, -1e9) > BOSS_EARLY_S:
                 note('merchant', '%s seen outside %s: not posted unless %s starts' % (merchant, pretty(need), pretty(need)))
             self._boss_seen[merchant] = time.monotonic()
@@ -1937,7 +1940,10 @@ class MacroEngine:
                                   posted[merchant])
         except Exception:
             pass
-        if not self.cfg_bool('silent_merchant'):
+        # Bosses always post in Discord webhooks even when Silent Merchant is on —
+        # Silent Merchant suppresses only regular merchant spawn alerts.
+        is_boss = merchant in ('Sinister P.', 'Sinister S')
+        if not self.cfg_bool('silent_merchant') or is_boss:
             post_merchant(url or self.url, merchant, self.server_link or game.load_settings().get('private_server', ''),
                           watch=list(self.wanted), collect=self.collect and merchant in self.collect_names, how=how)
         else:
@@ -2317,6 +2323,7 @@ class MacroEngine:
         self.ai_preflight()
         self._set(phase='running', colour=GOOD)
         while not game.ABORT:
+            game.make_roblox_topmost()
             if self.paused:
                 self._pause_wait()
                 if game.ABORT:
