@@ -2661,7 +2661,8 @@ class MacroEngine:
             self.daily_later()
             self.watch = game.Watch()
             return True
-        if not self.reconnect_on:
+        # read live so toggling Auto Reconnect in the UI takes effect immediately
+        if not self.cfg_bool('auto_reconnect'):
             return self.wait_for_game(why or '')
         note('connection', 'reconnecting: %s' % (why or ''))
         post_status(self.url, 'Reconnecting', capital(why), EMBED_BAD, 'Connection')
