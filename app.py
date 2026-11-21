@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import datetime, timezone
 import base64
 import ctypes
 from ctypes import wintypes
@@ -3570,6 +3571,15 @@ def _can_write_dir(folder):
         return False
 
 
+def _release_asset_time(asset):
+    """Epoch seconds from a GitHub asset's updated_at, or 0 when unavailable."""
+    stamp = (asset or {}).get('updated_at') or (asset or {}).get('created_at') or ''
+    try:
+        return datetime.strptime(stamp, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc).timestamp()
+    except (TypeError, ValueError):
+        return 0
+
+
 def _fetch_latest_release():
     req = urllib.request.Request(RELEASES, headers={'User-Agent': TITLE, 'Accept': 'application/vnd.github+json'})
     with urllib.request.urlopen(req, timeout=12) as r:
@@ -3586,12 +3596,13 @@ def _fetch_latest_release():
             asset = next((a for a in assets if 'mmacro' in a.get('name', '').lower() and a.get('name', '').lower().endswith('.exe')), None)
         if asset:
             tag = rel.get('tag_name', '')
-            candidates.append((_version_tuple(tag), tag, asset['browser_download_url'], int(asset.get('size') or 0)))
+            candidates.append((_version_tuple(tag), tag, asset['browser_download_url'],
+                               int(asset.get('size') or 0), _release_asset_time(asset)))
     if not candidates:
         return None
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    _, tag, url, size = candidates[0]
-    return (tag, url, size)
+    candidates.sort(key=lambda x: (x[0], x[4]), reverse=True)
+    _, tag, url, size, asset_time = candidates[0]
+    return (tag, url, size, asset_time)
 
 
 def _fetch_remote_source_version():
@@ -3711,13 +3722,28 @@ def _attach_auto_updater():
                             _set_upd(self, 'error', 'Update check failed (%s)' % type(e).__name__)
                             return
 
-                if not remote_ver or _version_tuple(remote_ver) <= _version_tuple(VERSION):
+                newer_ver = bool(remote_ver) and _version_tuple(remote_ver) > _version_tuple(VERSION)
+                refreshed_build = False
+                if found and not newer_ver and found[3]:
+                    # A release asset can be replaced without changing its tag.
+                    # Pick that up by comparing the asset time with the running file.
+                    try:
+                        local_file = sys.executable if frozen else os.path.join(HERE_DIR, 'app.py')
+                        local_mtime = os.path.getmtime(local_file)
+                    except OSError:
+                        local_mtime = 0
+                    refreshed_build = found[3] > local_mtime + 60
+
+                if not remote_ver or (not newer_ver and not refreshed_build):
                     note('update', 'up to date (v%s)' % VERSION)
                     _set_upd(self, 'uptodate', 'Up to date (v%s)' % VERSION, 100, remote_ver or VERSION)
                     return
 
                 clean_tag = remote_ver.lstrip('v')
-                note('update', 'new update v%s found (current v%s)' % (clean_tag, VERSION))
+                if newer_ver:
+                    note('update', 'new update v%s found (current v%s)' % (clean_tag, VERSION))
+                else:
+                    note('update', 'newer build for v%s found' % clean_tag)
                 if not manual and (not self.cfg_bool('auto_update', True) or self.running or self.ran):
                     _set_upd(self, 'available', 'Update v%s ready' % clean_tag, 0, clean_tag)
                     return
@@ -3730,7 +3756,7 @@ def _attach_auto_updater():
 
                 self.updating = True
                 if frozen:
-                    tag, url, size = found
+                    tag, url, size, _asset_ts = found
                     zipped = url.lower().endswith('.zip')
                     new_path = os.path.join(tempfile.gettempdir(), 'MMacro_update.zip') if zipped else sys.executable + '.new'
                     _set_upd(self, 'downloading', 'Updating to v%s (0%%)...' % clean_tag, 0, clean_tag)
