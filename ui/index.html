@@ -332,6 +332,10 @@
     color: #4ade80; background: rgba(34,197,94,.16); border-color: rgba(34,197,94,.55);
     box-shadow: 0 0 12px rgba(34,197,94,.35);
   }
+  /* Developer chip: locked glows yellow, unlocked glows red */
+  .mode-chip.dev-chip { cursor: not-allowed; opacity: .9; }
+  .mode-chip.dev-chip.locked { color: #fbbf24; border-color: rgba(251,191,36,.55); box-shadow: 0 0 14px rgba(251,191,36,.35); }
+  .mode-chip.dev-chip.unlocked { color: #f87171; border-color: rgba(248,113,113,.55); box-shadow: 0 0 14px rgba(248,113,113,.35); }
 
   .user-sub {
     display: flex; align-items: center; gap: 8px;
@@ -1935,6 +1939,7 @@
               <span class="mode-chip" data-mode="idle" onclick="setMode('idle')" title="Idle — no fishing or Eden">IDLE</span>
               <span class="mode-chip" data-mode="fishing" onclick="setMode('fishing')" title="Auto Fishing mode">FISHING</span>
               <span class="mode-chip" data-mode="eden" onclick="setMode('eden')" title="Eden Hunter mode">EDEN</span>
+              <span class="mode-chip dev-chip" id="devChip" title="Developer Mode — locked"></span>
             </div>
           </div>
           <div class="user-sub">
@@ -2517,6 +2522,37 @@
               <div class="row-info"><div class="row-lbl">Reset Everything (Fresh User)</div><div class="row-hint">Erases webhook URL, private server, shopping list, history and custom avatar</div></div>
               <div style="display:flex;gap:8px;align-items:center">
                 <button class="btn-danger" id="resetBtn" onclick="requestResetAll()">🔄 Reset Everything</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- DEVELOPER MODE (passkey locked, session only) -->
+          <div class="card" id="developerCard">
+            <div class="card-hdr">
+              <div>
+                <div class="card-title">Developer Mode</div>
+                <div class="card-sub">Unified passkey unlocks developer tools. Locks again when you close Veyra.</div>
+              </div>
+              <span class="badge" id="developerBadge" style="color:var(--dim)">LOCKED</span>
+            </div>
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+              <div id="developerLockedView">
+                <div>
+                  <div class="row-lbl" style="margin-bottom:8px">Passkey</div>
+                  <input class="input" type="password" id="inp-dev_passkey" placeholder="Enter developer passkey" onkeydown="if(event.key==='Enter')unlockDev()" />
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <button class="btn-sm" onclick="unlockDev()">🔓 Unlock</button>
+                    <span class="mono" style="font-size:11px;color:var(--dim)">Session only — re-enter on restart</span>
+                  </div>
+                </div>
+                <div class="row-hint" style="margin-top:4px">Only the person who knows the passkey can open Developer Mode.</div>
+              </div>
+              <div id="developerUnlockedView" style="display:none">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="color:var(--good)">✓ Unlocked</span>
+                  <button class="btn-sm" onclick="lockDev()" style="border-color:rgba(248,113,113,0.55);color:#fca5a5">🔒 Lock</button>
+                </div>
+                <div class="row-hint" style="margin-top:4px">Developer tools are now available. Re-enter the passkey after restarting Veyra.</div>
               </div>
             </div>
           </div>
@@ -3361,6 +3397,48 @@ function renderLogs() {
   }
 }
 
+async function unlockDev() {
+  const inp = document.getElementById('inp-dev_passkey');
+  const key = inp ? inp.value : '';
+  const res = await apiCall('verify_passkey', key);
+  if (res && res.ok) {
+    STATE.developer_locked = false;
+    inp.value = '';
+    renderAll();
+    showToast('Developer Mode unlocked — session only');
+  } else {
+    showToast('Wrong passkey');
+    if (inp) inp.value = '';
+  }
+}
+
+async function lockDev() {
+  const res = await apiCall('lock_developer');
+  if (res) {
+    STATE.developer_locked = true;
+    renderAll();
+    showToast('Developer Mode locked');
+  }
+}
+
+function updateDeveloperSettingsUI(locked) {
+  const lockedView = document.getElementById('developerLockedView');
+  const unlockedView = document.getElementById('developerUnlockedView');
+  const badge = document.getElementById('developerBadge');
+  if (!lockedView || !unlockedView) return;
+  if (locked) {
+    lockedView.style.display = '';
+    unlockedView.style.display = 'none';
+    badge.textContent = 'LOCKED';
+    badge.style.color = 'var(--dim)';
+  } else {
+    lockedView.style.display = 'none';
+    unlockedView.style.display = '';
+    badge.textContent = 'UNLOCKED';
+    badge.style.color = 'var(--good)';
+  }
+}
+
 function renderAll() {
   if (!STATE) return;
   const c = STATE.cfg;
@@ -3432,7 +3510,15 @@ function renderAll() {
   // Header & Sidebar
   document.getElementById('playerName').textContent = STATE.player_name;
   document.getElementById('instPlayerName').textContent = STATE.player_name;
-  document.getElementById('statusText').textContent = STATE.running ? (STATE.paused ? 'PAUSED' : 'LIVE') : (STATE.phase || 'IDLE').toUpperCase();
+  if (!!STATE.developer_locked === false) {
+    document.getElementById('statusText').textContent = 'DEVELOPER MODE';
+    document.getElementById('statusPill').classList.add('live');
+    document.getElementById('statusPill').classList.remove('paused');
+  } else {
+    document.getElementById('statusText').textContent = STATE.running ? (STATE.paused ? 'PAUSED' : 'LIVE') : (STATE.phase || 'IDLE').toUpperCase();
+    document.getElementById('statusPill').classList.toggle('live', STATE.running && !STATE.paused);
+    document.getElementById('statusPill').classList.toggle('paused', !!(STATE.running && STATE.paused));
+  }
   document.getElementById('statusPill').classList.toggle('live', STATE.running && !STATE.paused);
   document.getElementById('statusPill').classList.toggle('paused', !!(STATE.running && STATE.paused));
   const activeModes = new Set();
@@ -3442,8 +3528,32 @@ function renderAll() {
     if (STATE.cfg && STATE.cfg.eden_on) activeModes.add('eden');
     if (!activeModes.size) activeModes.add('idle');
   }
-  document.querySelectorAll('#modeChips .mode-chip').forEach(el =>
-    el.classList.toggle('on', activeModes.has(el.dataset.mode)));
+  // Developer Mode: when unlocked, hide every active thing and keep only "DEVELOPER MODE"
+  const devLocked = !!STATE.developer_locked;
+  const devChip = document.getElementById('devChip');
+  if (devChip) {
+    if (devLocked) {
+      devChip.textContent = 'DEV';
+      devChip.className = 'mode-chip dev-chip locked';
+      devChip.onclick = null;
+      devChip.title = 'Developer Mode — locked';
+    } else {
+      devChip.textContent = 'DEVELOPER MODE';
+      devChip.className = 'mode-chip dev-chip unlocked';
+      devChip.onclick = null;
+      devChip.title = 'Developer Mode — unlocked';
+    }
+  }
+  document.querySelectorAll('#modeChips .mode-chip').forEach(el => {
+    if (el.id === 'devChip') return;
+    if (!devLocked) {
+      el.style.display = 'none';
+    } else {
+      el.style.display = '';
+      el.classList.toggle('on', activeModes.has(el.dataset.mode));
+    }
+  });
+  updateDeveloperSettingsUI(devLocked);
   document.getElementById('uptimeText').textContent = STATE.uptime;
   document.getElementById('robloxPill').classList.toggle('linked', STATE.roblox_up);
   document.getElementById('robloxText').textContent = STATE.roblox_up ? 'ROBLOX: LINKED' : 'ROBLOX: OFFLINE';

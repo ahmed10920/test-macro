@@ -255,6 +255,10 @@ os.makedirs(BIOMES_DIR, exist_ok=True)
 TITLE = 'Veyra'
 VERSION = '1.0.2'
 
+# Unified developer-mode passkey (baked into the .exe; session-only unlock).
+# Only the person who knows this key can open Developer Mode.
+DEVELOPER_PASSKEY = 'veyradevmode262010'
+
 
 def dark_message(title, message):
     """Dark-themed message box — Windows MessageBoxW ignores the app theme."""
@@ -1169,6 +1173,8 @@ class MacroEngine:
         self._preview_biome = None
         self._support = None
         self._support_lock = threading.Lock()
+        # Developer Mode: locked at the start of every session (session-only unlock).
+        self.developer_locked = True
         self.update_info = {'state': 'idle', 'msg': 'Up to date (v%s)' % VERSION, 'progress': 0, 'latest': VERSION}
         self.url = ''
         self.use_items = False
@@ -1622,6 +1628,19 @@ class MacroEngine:
             if not enabled:
                 presence.set_activity(None)
                 return
+            if not getattr(self, 'developer_locked', True):
+                presence.set_activity({
+                    'details': 'Veyra Macro\nMode: Developer',
+                    'state': 'Status: Developer Mode\nPasskey-locked session\nDownload: Veyra Macro',
+                    'buttons': [{'label': '🌌 Download Veyra Macro', 'url': RELEASE_PAGE}],
+                    'assets': {
+                        'large_image': 'macro_logo',
+                        'large_text': 'Developer Mode',
+                        'small_image': 'macro_logo',
+                        'small_text': 'Developer',
+                    },
+                })
+                return
             if not self.running:
                 presence.set_activity({
                     'details': 'Veyra Macro\nMode: Idle',
@@ -1770,6 +1789,7 @@ class MacroEngine:
                 'logs': logs,
                 'support': supp,
                 'version': VERSION,
+                'developer_locked': self.developer_locked,
                 'update_info': dict(self.update_info),
                 'discord_status': self.presence.status() if self.presence is not None else {'status': 'off', 'detail': ''},
                 'pc': self.pc_info(),
@@ -3321,6 +3341,21 @@ class Api:
                 self.engine.sync_runtime_cfg(patch)
             self.engine.refresh_discord()
         return self.engine.build_state()
+
+    def verify_passkey(self, key):
+        """Unlock Developer Mode with the unified passkey. Session-only: relocks on restart."""
+        key = (key or '').strip()
+        ok = bool(key) and key == DEVELOPER_PASSKEY
+        with self.engine._lock:
+            if ok:
+                self.engine.developer_locked = False
+        return {'ok': ok, 'developer_locked': self.engine.developer_locked}
+
+    def lock_developer(self):
+        """Re-lock Developer Mode (session ends / user clicks Lock)."""
+        with self.engine._lock:
+            self.engine.developer_locked = True
+        return {'ok': True, 'developer_locked': self.engine.developer_locked}
 
     def sync_roblox_profile(self, username):
         self.engine.apply_roblox_username(username, sync=True)
