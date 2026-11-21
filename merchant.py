@@ -215,9 +215,21 @@ def open_shop(halt, say=print):
         game.click(*at, park=False)
         if not nap(0.8, halt):
             return False
-        if points.dialogue_up():                        # the click was lost
+        if points.dialogue_up():                        # the click was lost: retry the same choice
             lost += 1
-            say('  try %d: Open Shop was clicked but stayed up' % go)
+            say('  try %d: Open Shop was clicked but stayed up (retrying the choice)' % go)
+            for retry in range(3):
+                if halt():
+                    return False
+                again = points.choice('green')
+                if again is None or not points.dialogue_up():
+                    break
+                game.click(*again, park=False)
+                if not nap(0.5, halt):
+                    return False
+                if not points.dialogue_up():            # it took
+                    points.leave_dialogue()
+                    return nap(0.3, halt)
             continue
         points.leave_dialogue()
         return nap(0.3, halt)

@@ -2128,6 +2128,46 @@ class MacroEngine:
         threading.Thread(target=self._guard, daemon=True).start()
         return None
 
+    def sync_runtime_cfg(self, patch=None):
+        """Refresh fields cached at start so UI toggles apply live, without a restart."""
+        patch = patch or {}
+        try:
+            self.url = clean_url(self.cfg_str('webhook_url'))
+            self.wanted = self.wanted_items()
+            self.collect_names = set(self.cfg.get('collect_merchants') or ['Jester', 'Mari', 'Rin'])
+            self.use_items = self.cfg_bool('auto_items')
+            self.reconnect_on = self.cfg_bool('auto_reconnect')
+            self.rune_biomes = set(self.cfg.get('rune_biomes') or RUNE_BIOMES) if self.cfg_bool('rune_on') else set()
+            self.rune_wait = self.rune_delay()
+            self.selector_biome = self.cfg_str('selector_biome', 'HEAVEN') if self.cfg_bool('selector_on') else None
+            if self.selector_biome and self.selector_due is None:
+                self.selector_due = time.monotonic()
+            elif not self.selector_biome:
+                self.selector_due = None
+            self.pop_list = self.pop_items()
+            self.pop_biomes = set(self.pop_list) if self.cfg_bool('pop_on') else set()
+            self.clip_min = clip_floor(self.cfg_str('clip_min', '1,000,000,000'))
+            self.equip_aura = self._correct_aura() if self.cfg_bool('equip_on') else None
+            if self.equip_aura and self.equip_due is None:
+                self.equip_due = time.monotonic()
+            elif not self.equip_aura:
+                self.equip_due = None
+            # new aura to keep equipped: schedule it promptly
+            if 'equip_on' in patch or 'equip_aura' in patch:
+                self.equip_fails = 0
+                if self.equip_aura:
+                    self.equip_due = time.monotonic()
+            if 'rune_on' in patch or 'rune_biomes' in patch or 'rune_after' in patch:
+                self.rune_due = (time.monotonic() + self.rune_wait) if self.rune_biomes else None
+                self.rune_tries = 0
+            if 'pop_on' in patch or 'pop_items' in patch:
+                self.pop_due = time.monotonic() if self.pop_biomes else None
+            if 'fish_on' in patch or 'eden_on' in patch:
+                self.crack_on = self.cfg_bool('eden_on')
+            note('cfg', 'settings applied live')
+        except Exception as e:
+            note('cfg', 'live apply failed: %s: %s' % (type(e).__name__, e))
+
     def tell(self, title, detail='', colour=None, area='Macro'):
         thumb = (asset_png('rune_icon.png') if area == 'Rune'
                  else biome_png(self.biome_now) if area in ('Biome', 'Pop', 'Selector') and self.biome_now else None)
@@ -2734,6 +2774,13 @@ class MacroEngine:
             watch.poll()
             if watch.state == 'joined' and game.in_game(watch):
                 return True
+            # skip the FLASH WARNING / intro cutscene so the rejoin doesn't sit on it
+            try:
+                if game.flash_warning_up():
+                    game.skip_intro(stop=lambda: game.ABORT,
+                                    say=lambda m: note('connection', m))
+            except Exception:
+                pass
             if game.find_play() is not None or (watch.in_menu and time.time() - watch.menu_at < game.MENU_S):
                 clear_since = None
                 if time.monotonic() - clicked > PLAY_EVERY_S:
@@ -3270,6 +3317,8 @@ class Api:
             if any(k in patch for k in ('perf_mode', 'low_end', 'fx_on')):
                 self.engine.slow_pc = self.engine.wants_lite()
                 game.set_pace(2.0 if self.engine.slow_pc else 1.0)
+            if self.engine.running:
+                self.engine.sync_runtime_cfg(patch)
             self.engine.refresh_discord()
         return self.engine.build_state()
 

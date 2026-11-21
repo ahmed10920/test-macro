@@ -1397,6 +1397,44 @@ def find_play():
 MENU_S = 90.0            # trust the title-screen flag this long; some clients never log the aura after Play
 
 
+def flash_warning_up():
+    """Sol's RNG opens with a black 'FLASH WARNING' screen you must click through.
+    True when most of the client is black with a little red in the middle."""
+    try:
+        box = client_box((0.0, 0.0, 1.0, 1.0))
+        img = grab(box).astype(np.int16)
+        h, w = img.shape[:2]
+        if h < 40 or w < 40:
+            return False
+        # sample a grid of the whole client: a flash-warning frame is almost all black
+        ys = np.linspace(0, h - 1, 12).astype(int)
+        xs = np.linspace(0, w - 1, 12).astype(int)
+        dark = (img[np.ix_(ys, xs)].max(axis=2) < 28).mean()
+        # red text sits in a band across the middle; scan it at full resolution
+        band = img[h * 2 // 5:h * 3 // 5, w // 5:w * 4 // 5]
+        red = ((band[:, :, 0] > 90) & (band[:, :, 0] > band[:, :, 1] + 40)).mean()
+        return dark > 0.85 and red > 0.0003
+    except Exception:
+        return False
+
+
+def skip_intro(stop=lambda: False, say=lambda m: None):
+    """Click through Sol's RNG's FLASH WARNING / intro screens after joining."""
+    skipped = 0
+    for _ in range(6):
+        if stop() or not flash_warning_up():
+            break
+        box = client_box((0.0, 0.0, 1.0, 1.0))
+        cx = (box[0] + box[2]) // 2
+        cy = (box[1] + box[3]) // 2
+        click(cx, cy, park=False, settle=0.3)
+        skipped += 1
+        time.sleep(0.6)
+    if skipped:
+        say('clicked through the intro (%d)' % skipped)
+    return skipped
+
+
 def in_game(watch):
     """In game with a real aura? (_None_ shows on the title screen too.)"""
     on_menu = watch.in_menu and time.time() - getattr(watch, 'menu_at', time.time()) < MENU_S
@@ -1420,6 +1458,9 @@ def press_play(watch, stop=lambda: False, say=lambda m: None, timeout=90.0, play
         watch.poll()
         play_due, pressed = calibrated_play(watch, play_due, say)
         presses += pressed
+        # click through the FLASH WARNING before looking for Play
+        if flash_warning_up():
+            skip_intro(stop=stop, say=say)
         at = find_play() if presses < PLAY_PRESSES else None
         if at is not None:
             gone = 0
