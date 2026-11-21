@@ -1409,33 +1409,34 @@ def flash_warning_up():
         # sample a grid of the whole client: a flash-warning frame is almost all black
         ys = np.linspace(0, h - 1, 12).astype(int)
         xs = np.linspace(0, w - 1, 12).astype(int)
-        dark = (img[np.ix_(ys, xs)].max(axis=2) < 28).mean()
+        dark = (img[np.ix_(ys, xs)].max(axis=2) < 35).mean()
         # red text sits in a band across the middle; scan it at full resolution
         band = img[h * 2 // 5:h * 3 // 5, w // 5:w * 4 // 5]
-        red = ((band[:, :, 0] > 90) & (band[:, :, 0] > band[:, :, 1] + 40)).mean()
-        return dark > 0.85 and red > 0.0003
+        red = ((band[:, :, 0] > 80) & (band[:, :, 0] > band[:, :, 1] + 30)).mean()
+        return dark > 0.80 and red > 0.0001
     except Exception:
         return False
 
 
 def skip_intro(stop=lambda: False, say=lambda m: None):
     """Click through Sol's RNG's FLASH WARNING / intro screens after joining.
-    Clicks lower-centre where Roblox's "Click here to skip" link sits on the
-    loading screen, so the intro is dismissed quickly instead of waiting it out.
-    All positions are percentages of the client box, so every resolution works."""
+    Only clicks at the known "Click here to skip" position (bottom-centre of the
+    loading screen, ~75% client height, centre-x) — precise and resolution-independent
+    via percentages of the client box."""
     skipped = 0
-    for _ in range(6):
+    for _ in range(4):
         if stop() or not flash_warning_up():
             break
         box = client_box((0.0, 0.0, 1.0, 1.0))
-        cx = (box[0] + box[2]) // 2          # centre horizontally (~49.4% from left of the skip-text cluster)
+        cx = (box[0] + box[2]) // 2          # centre horizontally
         ch = box[3] - box[1]
-        # try a vertical spread starting just above where the skip link lives (73.5%)
-        # 6 retries span 73% → 97% so at least one click hits the link
-        cy = box[1] + int(ch * (0.73 + 0.04 * skipped))
+        # Known position: "Click here to skip" sits near the bottom of the loading screen.
+        # 75% y from top, centre-x. 4 retries at the same position, spaced out,
+        # each preceded by a flash_warning_up() check.
+        cy = box[1] + int(ch * 0.75)
         click(cx, cy, park=False, settle=0.3)
         skipped += 1
-        time.sleep(0.6)
+        time.sleep(0.5)
     if skipped:
         say('clicked through the intro (%d)' % skipped)
     return skipped

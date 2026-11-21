@@ -2866,7 +2866,7 @@ function setSub(id, open) {
 
 const THEMES = ['dark', 'white', 'midnight', 'ember', 'forest', 'bw'];
 function applyTheme(name) {
-  const theme = THEMES.indexOf(name) >= 0 ? name : 'dark';
+  const theme = THEMES.indexOf(name) >= 0 ? name : 'bw';
   document.documentElement.setAttribute('data-theme', theme);
   document.querySelectorAll('.theme-swatch').forEach(el => {
     el.classList.toggle('on', el.dataset.theme === theme);
