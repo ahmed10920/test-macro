@@ -1924,11 +1924,17 @@ class MacroEngine:
             self._set(biome=(failed, BAD) if failed else ('idle', DIM))
 
     def boss_present(self):
-        """A boss confirmed in-game is still around, so skip the Cursed Rune."""
+        """A boss confirmed in-game is still around in its own biome, so skip the Cursed Rune."""
         now = time.monotonic()
         self._boss_here = {b: at for b, at in self._boss_here.items()
                            if now - at <= BOSS_HERE_S}
-        return bool(self._boss_here)
+        if not self._boss_here:
+            return False
+        here = base_biome(self.biome_now or '').replace(' ', '').upper()
+        if not here:
+            return True
+        return any(BOSS_BIOMES.get(b, '').replace(' ', '').upper() == here
+                   for b in self._boss_here)
 
     def merchant_arrived(self, merchant, how, url=None):
         posted = self._merchant_posted
