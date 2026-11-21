@@ -1419,14 +1419,16 @@ def flash_warning_up():
 
 
 def skip_intro(stop=lambda: False, say=lambda m: None):
-    """Click through Sol's RNG's FLASH WARNING / intro screens after joining."""
+    """Click through Sol's RNG's FLASH WARNING / intro screens after joining.
+    Clicks lower-centre where Roblox's "Click here to skip" link sits on the
+    loading screen, so the intro is dismissed quickly instead of waiting it out."""
     skipped = 0
     for _ in range(6):
         if stop() or not flash_warning_up():
             break
         box = client_box((0.0, 0.0, 1.0, 1.0))
         cx = (box[0] + box[2]) // 2
-        cy = (box[1] + box[3]) // 2
+        cy = box[1] + int((box[3] - box[1]) * 0.80)   # "Click here to skip" lives near the bottom
         click(cx, cy, park=False, settle=0.3)
         skipped += 1
         time.sleep(0.6)
