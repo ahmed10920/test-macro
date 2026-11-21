@@ -2121,6 +2121,10 @@ class MacroEngine:
         game.PAUSED.clear()
         self.running = True
         self.phase('running', GOOD)
+        try:
+            self._toast.banner('start', 2000)
+        except Exception:
+            pass
         threading.Thread(target=self._guard, daemon=True).start()
         return None
 
@@ -2167,6 +2171,10 @@ class MacroEngine:
             ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
             self.running = False
             self.paused = False
+            try:
+                self._toast.banner('stop', 2000)
+            except Exception:
+                pass
             game.PAUSED.clear()
             if self.biome_stop is not None:
                 self.biome_stop.set()
