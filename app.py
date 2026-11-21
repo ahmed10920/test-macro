@@ -851,8 +851,18 @@ def asset_png(name):
     return _asset_cache[name]
 
 
+def _screen_shot():
+    """Current Roblox screen as PNG bytes, or None when the capture is unavailable."""
+    try:
+        buf = io.BytesIO()
+        Image.fromarray(game.grab(game.client_box((0.0, 0.0, 1.0, 1.0)))).save(buf, 'PNG')
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
 def post_alert(webhook_url, title, detail, colour, area, icon, emoji=''):
-    """Small alert card with its own icon — no screenshot attached."""
+    """Small alert card with its own icon and a screenshot of the failure."""
     if not webhook_url:
         return
     embed = {
@@ -871,6 +881,10 @@ def post_alert(webhook_url, title, detail, colour, area, icon, emoji=''):
     if blob:
         files['alert.png'] = blob
         embed['thumbnail'] = {'url': 'attachment://alert.png'}
+    shot = _screen_shot()
+    if shot:
+        files['shot.png'] = shot
+        embed['image'] = {'url': 'attachment://shot.png'}
     _post(webhook_url, {'embeds': [embed]}, files)
 
 
@@ -2113,7 +2127,10 @@ class MacroEngine:
     def tell(self, title, detail='', colour=None, area='Macro'):
         thumb = (asset_png('rune_icon.png') if area == 'Rune'
                  else biome_png(self.biome_now) if area in ('Biome', 'Pop', 'Selector') and self.biome_now else None)
-        post_event(self.url, title, detail, colour if colour is not None else EMBED_INFO, area, thumb=thumb)
+        shade = colour if colour is not None else EMBED_INFO
+        # failures carry a screenshot so you can see what the macro saw
+        shot = _screen_shot() if shade == EMBED_BAD else None
+        post_event(self.url, title, detail, shade, area, thumb=thumb, shot=shot)
         self._set(phase='%s%s' % (title, ' - ' + detail if detail else ''))
 
     def _guard(self):
