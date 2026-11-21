@@ -1631,8 +1631,7 @@ class MacroEngine:
             if not getattr(self, 'developer_locked', True):
                 presence.set_activity({
                     'details': 'Veyra Macro\nMode: Developer',
-                    'state': 'Status: Developer Mode\nPasskey-locked session\nDownload: Veyra Macro',
-                    'buttons': [{'label': '🌌 Download Veyra Macro', 'url': RELEASE_PAGE}],
+                    'state': 'Status: Developer Mode\nPasskey-locked session',
                     'assets': {
                         'large_image': 'macro_logo',
                         'large_text': 'Developer Mode',
@@ -1644,8 +1643,7 @@ class MacroEngine:
             if not self.running:
                 presence.set_activity({
                     'details': 'Veyra Macro\nMode: Idle',
-                    'state': 'Status: Ready\nPress Start in the app to begin\nDownload: Veyra Macro',
-                    'buttons': [{'label': '🌌 Download Veyra Macro', 'url': RELEASE_PAGE}],
+                    'state': 'Status: Ready\nPress Start in the app to begin',
                     'assets': {
                         'large_image': 'macro_logo',
                         'large_text': 'Veyra Macro',
@@ -1667,12 +1665,10 @@ class MacroEngine:
             state_lines.append('Server: %d/%d players' % (
                 self.cfg_int('server_players', 1, 1), self.cfg_int('server_slots', 20, 1)))
             state_lines.append('Status: %s' % ('Paused' if self.paused else 'Running'))
-            state_lines.append('Download: Veyra Macro')
             presence.set_activity({
                 'details': details,
                 'state': '\n'.join(state_lines),
                 'timestamps': {'start': int(self.run_wall or time.time())},
-                'buttons': [{'label': '🌌 Download Veyra Macro', 'url': RELEASE_PAGE}],
                 'assets': {
                     'large_image': slug,
                     'large_text': 'Biome: %s' % (pretty(biome) or 'Normal'),
