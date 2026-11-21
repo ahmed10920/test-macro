@@ -1427,19 +1427,33 @@ def flash_warning_up():
         return False
 
 
-def skip_intro(stop=lambda: False, say=lambda m: None):
+def skip_intro(stop=lambda: False, say=lambda m: None, attempts=3):
     """Click through Sol's RNG's FLASH WARNING / intro screens after joining.
+
     Waits 5 seconds after the flash warning appears, then clicks the "Click here
-    to skip" position (bottom-centre, ~75% client height, centre-x) 3 times."""
+    to skip" spot (bottom-centre, ~75% client height, centre-x). After every
+    click it checks whether the Play button is up: if it is, the intro is over
+    and it stops clicking. If Play is still not there, it waits and clicks again
+    (up to `attempts` times). Clicks are always spaced out, never simultaneous.
+    """
     skipped = 0
-    for _ in range(3):
-        if stop() or not flash_warning_up():
+    for i in range(attempts):
+        if stop():
             break
-        # Wait 5 seconds after the flash warning appears before clicking
-        for _ in range(50):
-            if stop() or not flash_warning_up():
+        # 5s after the flash warning for the first click, then a real pause
+        # between later clicks so they are never fired at the same time.
+        for _ in range(int((5.0 if i == 0 else 3.0) * 10)):
+            if stop():
                 break
             time.sleep(0.1)
+        if stop():
+            break
+        # Play visible means we are through the intro - no more clicks needed.
+        try:
+            if find_play() is not None:
+                break
+        except Exception:
+            pass
         box = client_box((0.0, 0.0, 1.0, 1.0))
         cx = (box[0] + box[2]) // 2          # centre horizontally
         ch = box[3] - box[1]
@@ -1447,7 +1461,6 @@ def skip_intro(stop=lambda: False, say=lambda m: None):
         cy = box[1] + int(ch * 0.75)
         click(cx, cy, park=False, settle=0.3)
         skipped += 1
-        time.sleep(1.0)
     if skipped:
         say('clicked through the intro (%d)' % skipped)
     return skipped
