@@ -1428,10 +1428,11 @@ def skip_intro(stop=lambda: False, say=lambda m: None):
         if stop() or not flash_warning_up():
             break
         box = client_box((0.0, 0.0, 1.0, 1.0))
-        cx = (box[0] + box[2]) // 2          # centre horizontally
+        cx = (box[0] + box[2]) // 2          # centre horizontally (~49.4% from left of the skip-text cluster)
         ch = box[3] - box[1]
-        # try a small vertical spread near the bottom where the skip link lives
-        cy = box[1] + int(ch * (0.78 + 0.04 * skipped))
+        # try a vertical spread starting just above where the skip link lives (73.5%)
+        # 6 retries span 73% → 97% so at least one click hits the link
+        cy = box[1] + int(ch * (0.73 + 0.04 * skipped))
         click(cx, cy, park=False, settle=0.3)
         skipped += 1
         time.sleep(0.6)
