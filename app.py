@@ -1632,6 +1632,7 @@ class MacroEngine:
                 presence.set_activity({
                     'details': 'Veyra Macro\nMode: Developer',
                     'state': 'Status: Developer Mode\nPasskey-locked session',
+                    'buttons': [{'label': '🌌 Download Veyra Macro', 'url': RELEASE_PAGE}],
                     'assets': {
                         'large_image': 'macro_logo',
                         'large_text': 'Developer Mode',
@@ -1644,6 +1645,7 @@ class MacroEngine:
                 presence.set_activity({
                     'details': 'Veyra Macro\nMode: Idle',
                     'state': 'Status: Ready\nPress Start in the app to begin',
+                    'buttons': [{'label': '🌌 Download Veyra Macro', 'url': RELEASE_PAGE}],
                     'assets': {
                         'large_image': 'macro_logo',
                         'large_text': 'Veyra Macro',
@@ -1669,6 +1671,7 @@ class MacroEngine:
                 'details': details,
                 'state': '\n'.join(state_lines),
                 'timestamps': {'start': int(self.run_wall or time.time())},
+                'buttons': [{'label': '🌌 Download Veyra Macro', 'url': RELEASE_PAGE}],
                 'assets': {
                     'large_image': slug,
                     'large_text': 'Biome: %s' % (pretty(biome) or 'Normal'),
