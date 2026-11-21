@@ -2084,6 +2084,19 @@ def collection_open():
     return int((line.mean(axis=1) >= 0.8).sum()) >= 3
 
 
+def exit_collection(halted=lambda: False):
+    """Close the Collection window if a missed click left it open. True when shut."""
+    if not collection_open():
+        return True
+    for _ in range(3):
+        if halted():
+            return False
+        press_point('exit_collection', settle=0.5)
+        if not collection_open():
+            return True
+    return not collection_open()
+
+
 after_align = None       # run once after the next camera squaring (daily rewards after joining)
 align_fails = 0          # failed squarings in a row
 COLLECTION_EXTRA_S = 0.0 # adaptive extra settle added when a previous run had Collection issues
